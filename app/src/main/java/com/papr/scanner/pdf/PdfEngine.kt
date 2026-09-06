@@ -27,7 +27,12 @@ class PdfEngine(
 
         bitmapPdfCompiler.compile(pageFiles, outputFile) { canvas, bitmap, pageIndex ->
             if (options.ocrEnabled) {
-                ocrElementsByPage[pageIndex] = ocrTextStamper.recognize(bitmap)
+                // Injected as raw PDF operators, bypassing Canvas's page-scale transform,
+                // so bitmap-pixel coordinates must be scaled to PDF points explicitly here.
+                val scale = BitmapPdfCompiler.POINTS_PER_PIXEL
+                ocrElementsByPage[pageIndex] = ocrTextStamper.recognize(bitmap).map { element ->
+                    element.copy(x = element.x * scale, y = element.y * scale, fontSize = element.fontSize * scale)
+                }
             }
             options.signature?.let { placement ->
                 if (placement.pageIndex == pageIndex) {

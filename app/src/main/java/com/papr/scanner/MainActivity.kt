@@ -22,12 +22,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
@@ -45,6 +49,8 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
+    private var isGeneratingDebugPdf by mutableStateOf(false)
+
     private val scannerLauncher = registerForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
@@ -61,6 +67,7 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     PaprPlaceholder(
                         showDebugScanButton = BuildConfig.DEBUG,
+                        isGeneratingDebugPdf = isGeneratingDebugPdf,
                         onDebugScanClick = ::startDebugScan,
                     )
                 }
@@ -93,59 +100,64 @@ class MainActivity : ComponentActivity() {
         val pageUris = container.documentScannerManager.extractPageUris(data)
         if (pageUris.isEmpty()) return
 
+        isGeneratingDebugPdf = true
         lifecycleScope.launch {
-            val now = System.currentTimeMillis()
-            val documentId = container.documentRepository.insertDocument(
-                Document(
-                    id = 0,
-                    title = "Phase 3a Debug Scan",
-                    createdAt = now,
-                    updatedAt = now,
-                    pageCount = pageUris.size,
-                    thumbnailUri = "",
-                    pdfUri = null,
-                    folder = null,
+            try {
+                val now = System.currentTimeMillis()
+                val documentId = container.documentRepository.insertDocument(
+                    Document(
+                        id = 0,
+                        title = "Phase 3a Debug Scan",
+                        createdAt = now,
+                        updatedAt = now,
+                        pageCount = pageUris.size,
+                        thumbnailUri = "",
+                        pdfUri = null,
+                        folder = null,
+                    )
                 )
-            )
 
-            val pageFiles = container.documentScannerManager.importScannedPages(documentId, pageUris)
-            val outputFile = File(FileUtils.documentDir(this@MainActivity, documentId), "document.pdf")
+                val pageFiles = container.documentScannerManager.importScannedPages(documentId, pageUris)
+                val outputFile = File(FileUtils.documentDir(this@MainActivity, documentId), "document.pdf")
 
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeFile(pageFiles.first().absolutePath, bounds)
-            val signatureWidth = bounds.outWidth / 3
-            val signatureHeight = bounds.outHeight / 8
-            val signatureRect = Rect(
-                bounds.outWidth - signatureWidth - 40,
-                bounds.outHeight - signatureHeight - 40,
-                bounds.outWidth - 40,
-                bounds.outHeight - 40,
-            )
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(pageFiles.first().absolutePath, bounds)
+                val signatureWidth = bounds.outWidth / 3
+                val signatureHeight = bounds.outHeight / 8
+                val signatureRect = Rect(
+                    bounds.outWidth - signatureWidth - 40,
+                    bounds.outHeight - signatureHeight - 40,
+                    bounds.outWidth - 40,
+                    bounds.outHeight - 40,
+                )
 
-            container.pdfEngine.generatePdf(
-                pageFiles,
-                outputFile,
-                PdfGenerationOptions(
-                    ocrEnabled = true,
-                    signature = SignaturePlacement(
-                        bitmap = createDebugSignatureBitmap(signatureWidth, signatureHeight),
-                        pageIndex = 0,
-                        rect = signatureRect,
+                container.pdfEngine.generatePdf(
+                    pageFiles,
+                    outputFile,
+                    PdfGenerationOptions(
+                        ocrEnabled = true,
+                        signature = SignaturePlacement(
+                            bitmap = createDebugSignatureBitmap(signatureWidth, signatureHeight),
+                            pageIndex = 0,
+                            rect = signatureRect,
+                        ),
                     ),
-                ),
-            )
-            Log.d(
-                "PaprPhase3bSmoke",
-                "Generated PDF (OCR + signature) at ${outputFile.absolutePath}, size=${outputFile.length()} bytes",
-            )
+                )
+                Log.d(
+                    "PaprPhase3bSmoke",
+                    "Generated PDF (OCR + signature) at ${outputFile.absolutePath}, size=${outputFile.length()} bytes",
+                )
 
-            val shareUri = FileUtils.getShareableUri(this@MainActivity, outputFile)
-            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "application/pdf"
-                putExtra(Intent.EXTRA_STREAM, shareUri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                val shareUri = FileUtils.getShareableUri(this@MainActivity, outputFile)
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/pdf"
+                    putExtra(Intent.EXTRA_STREAM, shareUri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                startActivity(Intent.createChooser(shareIntent, "Share scanned PDF"))
+            } finally {
+                isGeneratingDebugPdf = false
             }
-            startActivity(Intent.createChooser(shareIntent, "Share scanned PDF"))
         }
     }
 
@@ -211,6 +223,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun PaprPlaceholder(
     showDebugScanButton: Boolean = false,
+    isGeneratingDebugPdf: Boolean = false,
     onDebugScanClick: () -> Unit = {},
 ) {
     Scaffold { innerPadding ->
@@ -236,8 +249,11 @@ private fun PaprPlaceholder(
                 style = MaterialTheme.typography.bodyLarge,
             )
             if (showDebugScanButton) {
-                Button(onClick = onDebugScanClick) {
-                    Text("Scan (debug)")
+                Button(onClick = onDebugScanClick, enabled = !isGeneratingDebugPdf) {
+                    Text(if (isGeneratingDebugPdf) "Generating PDF..." else "Scan (debug)")
+                }
+                if (isGeneratingDebugPdf) {
+                    CircularProgressIndicator(modifier = Modifier.padding(top = 16.dp))
                 }
             }
         }
