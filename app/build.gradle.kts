@@ -65,5 +65,8 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
 
     implementation(libs.mlkit.document.scanner)
+    implementation(libs.mlkit.text.recognition)
     implementation(libs.kotlinx.coroutines.android)
+
+    testImplementation(libs.junit)
 }

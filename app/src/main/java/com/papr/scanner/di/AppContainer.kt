@@ -8,7 +8,10 @@ import com.papr.scanner.data.local.db.PaprDatabase
 import com.papr.scanner.data.repository.DocumentRepository
 import com.papr.scanner.data.repository.DocumentRepositoryImpl
 import com.papr.scanner.pdf.BitmapPdfCompiler
+import com.papr.scanner.pdf.InvisibleTextLayerInjector
+import com.papr.scanner.pdf.OcrTextStamper
 import com.papr.scanner.pdf.PdfEngine
+import com.papr.scanner.pdf.SignatureStamper
 import com.papr.scanner.scanner.DocumentScannerManager
 
 private val Context.userPreferencesDataStore by preferencesDataStore(name = "user_prefs")
@@ -32,6 +35,6 @@ class AppContainer(private val context: Context) {
     }
 
     val pdfEngine: PdfEngine by lazy {
-        PdfEngine(BitmapPdfCompiler())
+        PdfEngine(BitmapPdfCompiler(), OcrTextStamper(), SignatureStamper(), InvisibleTextLayerInjector())
     }
 }
