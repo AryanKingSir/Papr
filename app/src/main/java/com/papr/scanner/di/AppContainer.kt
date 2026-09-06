@@ -3,6 +3,9 @@ package com.papr.scanner.di
 import android.content.Context
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
+import com.papr.scanner.billing.BillingManager
+import com.papr.scanner.billing.RealPlayBillingClient
+import com.papr.scanner.core.Constants
 import com.papr.scanner.data.local.datastore.UserPreferencesRepository
 import com.papr.scanner.data.local.db.PaprDatabase
 import com.papr.scanner.data.repository.DocumentRepository
@@ -43,5 +46,9 @@ class AppContainer(private val context: Context) {
             InvisibleTextLayerInjector(),
             PdfEncryptor(),
         )
+    }
+
+    val billingManager: BillingManager by lazy {
+        BillingManager(RealPlayBillingClient(context), userPreferencesRepository, Constants.PRO_PRODUCT_ID)
     }
 }
