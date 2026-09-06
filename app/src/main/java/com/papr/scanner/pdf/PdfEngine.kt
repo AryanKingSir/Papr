@@ -2,13 +2,18 @@ package com.papr.scanner.pdf
 
 import android.graphics.Bitmap
 import android.graphics.Rect
+import com.papr.scanner.pdf.security.PdfEncryptor
 import java.io.File
 
 data class SignaturePlacement(val bitmap: Bitmap, val pageIndex: Int, val rect: Rect)
 
+/** [ownerPassword] defaults to [userPassword] when blank, per the Standard Security Handler. */
+data class PasswordProtection(val userPassword: String, val ownerPassword: String = "")
+
 data class PdfGenerationOptions(
     val ocrEnabled: Boolean = false,
     val signature: SignaturePlacement? = null,
+    val passwordProtection: PasswordProtection? = null,
 )
 
 class PdfEngine(
@@ -16,6 +21,7 @@ class PdfEngine(
     private val ocrTextStamper: OcrTextStamper,
     private val signatureStamper: SignatureStamper,
     private val invisibleTextLayerInjector: InvisibleTextLayerInjector,
+    private val pdfEncryptor: PdfEncryptor,
 ) {
 
     suspend fun generatePdf(
@@ -43,6 +49,13 @@ class PdfEngine(
 
         if (options.ocrEnabled) {
             invisibleTextLayerInjector.inject(outputFile, ocrElementsByPage)
+        }
+
+        // Must run last: encryption turns every other object's bytes into
+        // ciphertext, so any later structural edit (OCR injection, etc.)
+        // would corrupt the file.
+        options.passwordProtection?.let { protection ->
+            pdfEncryptor.encrypt(outputFile, protection.userPassword, protection.ownerPassword)
         }
 
         return outputFile

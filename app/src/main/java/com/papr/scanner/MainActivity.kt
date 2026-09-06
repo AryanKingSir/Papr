@@ -40,6 +40,7 @@ import androidx.lifecycle.lifecycleScope
 import com.papr.scanner.core.FileUtils
 import com.papr.scanner.domain.model.Document
 import com.papr.scanner.domain.model.Page
+import com.papr.scanner.pdf.PasswordProtection
 import com.papr.scanner.pdf.PdfGenerationOptions
 import com.papr.scanner.pdf.SignaturePlacement
 import com.papr.scanner.presentation.theme.PaprTheme
@@ -50,6 +51,10 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
 
     private var isGeneratingDebugPdf by mutableStateOf(false)
+
+    companion object {
+        private const val DEBUG_PDF_PASSWORD = "papr1234"
+    }
 
     private val scannerLauncher = registerForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()
@@ -141,11 +146,13 @@ class MainActivity : ComponentActivity() {
                             pageIndex = 0,
                             rect = signatureRect,
                         ),
+                        passwordProtection = PasswordProtection(userPassword = DEBUG_PDF_PASSWORD),
                     ),
                 )
                 Log.d(
-                    "PaprPhase3bSmoke",
-                    "Generated PDF (OCR + signature) at ${outputFile.absolutePath}, size=${outputFile.length()} bytes",
+                    "PaprPhase3cSmoke",
+                    "Generated password-protected PDF (password: $DEBUG_PDF_PASSWORD) at " +
+                        "${outputFile.absolutePath}, size=${outputFile.length()} bytes",
                 )
 
                 val shareUri = FileUtils.getShareableUri(this@MainActivity, outputFile)
