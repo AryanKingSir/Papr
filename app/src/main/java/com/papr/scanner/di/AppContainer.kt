@@ -22,6 +22,8 @@ private val Context.userPreferencesDataStore by preferencesDataStore(name = "use
 
 class AppContainer(private val context: Context) {
 
+    val appContext: Context get() = context
+
     private val database: PaprDatabase by lazy {
         Room.databaseBuilder(context, PaprDatabase::class.java, PaprDatabase.NAME).build()
     }
