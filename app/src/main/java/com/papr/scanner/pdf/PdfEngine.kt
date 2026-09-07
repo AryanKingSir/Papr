@@ -3,6 +3,8 @@ package com.papr.scanner.pdf
 import android.graphics.Bitmap
 import android.graphics.Rect
 import com.papr.scanner.pdf.security.PdfEncryptor
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 data class SignaturePlacement(val bitmap: Bitmap, val pageIndex: Int, val rect: Rect)
@@ -14,6 +16,7 @@ data class PdfGenerationOptions(
     val ocrEnabled: Boolean = false,
     val signature: SignaturePlacement? = null,
     val passwordProtection: PasswordProtection? = null,
+    val targetSizeBytes: Long? = null,
 )
 
 class PdfEngine(
@@ -28,10 +31,10 @@ class PdfEngine(
         pageFiles: List<File>,
         outputFile: File,
         options: PdfGenerationOptions = PdfGenerationOptions(),
-    ): File {
+    ): File = withContext(Dispatchers.IO) {
         val ocrElementsByPage = mutableMapOf<Int, List<OcrTextElement>>()
 
-        bitmapPdfCompiler.compile(pageFiles, outputFile) { canvas, bitmap, pageIndex ->
+        bitmapPdfCompiler.compile(pageFiles, outputFile, options.targetSizeBytes) { canvas, bitmap, pageIndex ->
             if (options.ocrEnabled) {
                 // Injected as raw PDF operators, bypassing Canvas's page-scale transform,
                 // so bitmap-pixel coordinates must be scaled to PDF points explicitly here.
@@ -58,6 +61,6 @@ class PdfEngine(
             pdfEncryptor.encrypt(outputFile, protection.userPassword, protection.ownerPassword)
         }
 
-        return outputFile
+        outputFile
     }
 }
