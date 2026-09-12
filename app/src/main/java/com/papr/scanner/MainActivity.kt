@@ -30,8 +30,10 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
 
@@ -176,7 +178,7 @@ class MainActivity : ComponentActivity() {
         val page = existingPages.firstOrNull { it.id == target.pageId } ?: return
 
         val newFile = container.documentScannerManager.importScannedPages(target.documentId, pageUris.take(1)).first()
-        File(page.imageUri).delete()
+        withContext(Dispatchers.IO) { File(page.imageUri).delete() }
         container.documentRepository.updatePage(page.copy(imageUri = newFile.absolutePath))
 
         if (target.pageIndex == 0) {

@@ -149,7 +149,7 @@ class DocumentDetailViewModel(
             runCatching {
                 fileMutex.withLock {
                     documentRepository.deletePage(page)
-                    File(page.imageUri).delete()
+                    withContext(Dispatchers.IO) { File(page.imageUri).delete() }
 
                     val remaining = uiState.value.pages.filter { it.id != page.id }.sortedBy { it.pageIndex }
                     if (remaining.isEmpty()) {
@@ -192,8 +192,10 @@ class DocumentDetailViewModel(
     private suspend fun deleteDocumentLocked() {
         val document = uiState.value.document ?: return
         documentRepository.deleteDocument(document)
-        FileUtils.documentDir(appContext, document.id).deleteRecursively()
-        FileUtils.thumbnailFile(appContext, document.id).delete()
+        withContext(Dispatchers.IO) {
+            FileUtils.documentDir(appContext, document.id).deleteRecursively()
+            FileUtils.thumbnailFile(appContext, document.id).delete()
+        }
         isDeleted.value = true
     }
 

@@ -6,12 +6,14 @@ import androidx.lifecycle.viewModelScope
 import com.papr.scanner.core.FileUtils
 import com.papr.scanner.data.repository.DocumentRepository
 import com.papr.scanner.domain.model.Document
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class HomeViewModel(
     private val documentRepository: DocumentRepository,
@@ -44,8 +46,10 @@ class HomeViewModel(
     fun deleteDocument(document: Document) {
         viewModelScope.launch {
             documentRepository.deleteDocument(document) // Room cascade-deletes the page rows
-            FileUtils.documentDir(appContext, document.id).deleteRecursively()
-            FileUtils.thumbnailFile(appContext, document.id).delete()
+            withContext(Dispatchers.IO) {
+                FileUtils.documentDir(appContext, document.id).deleteRecursively()
+                FileUtils.thumbnailFile(appContext, document.id).delete()
+            }
         }
     }
 }
