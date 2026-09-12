@@ -15,6 +15,7 @@ import com.papr.scanner.pdf.PdfEngine
 import com.papr.scanner.pdf.PdfGenerationOptions
 import com.papr.scanner.pdf.SignaturePlacement
 import java.io.File
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -24,6 +25,9 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 class DocumentDetailViewModel(
     private val documentId: Long,
@@ -37,6 +41,11 @@ class DocumentDetailViewModel(
     private val isExporting = MutableStateFlow(false)
     private val isDeleted = MutableStateFlow(false)
     private val refreshTrigger = MutableStateFlow(0)
+
+    // Serializes every operation that reads or writes a page's image file
+    // (rotate/move/delete/export all touch the same on-disk JPEGs), so two
+    // overlapping taps can't race a write against a read of the same file.
+    private val fileMutex = Mutex()
 
     private data class FlowsSnapshot(
         val document: Document?,
@@ -87,17 +96,24 @@ class DocumentDetailViewModel(
 
     fun rotatePage(page: Page) {
         viewModelScope.launch {
-            FileUtils.rotateJpeg(File(page.imageUri), 90f)
-            // page.imageUri is already known to be correct here - no need to
-            // consult uiState.value.pages, which is reactive and can still
-            // reflect pre-mutation data at this exact point (see deletePage's
-            // history: reading it right after a DB write is a real race, not
-            // a hypothetical one).
-            if (page.pageIndex == 0) {
-                FileUtils.generateThumbnail(appContext, documentId, File(page.imageUri))
+            runCatching {
+                fileMutex.withLock {
+                    FileUtils.rotateJpeg(File(page.imageUri), 90f)
+                    // page.imageUri is already known to be correct here - no need to
+                    // consult uiState.value.pages, which is reactive and can still
+                    // reflect pre-mutation data at this exact point (see deletePage's
+                    // history: reading it right after a DB write is a real race, not
+                    // a hypothetical one).
+                    if (page.pageIndex == 0) {
+                        FileUtils.generateThumbnail(appContext, documentId, File(page.imageUri))
+                    }
+                    touchDocument()
+                }
+            }.onSuccess {
+                refreshTrigger.value++
+            }.onFailure { e ->
+                _errors.emit(e.message ?: "Failed to rotate page")
             }
-            touchDocument()
-            refreshTrigger.value++
         }
     }
 
@@ -107,57 +123,78 @@ class DocumentDetailViewModel(
         val targetIdx = currentIdx + direction
         if (currentIdx == -1 || targetIdx !in pages.indices) return
         viewModelScope.launch {
-            val other = pages[targetIdx]
-            documentRepository.updatePage(page.copy(pageIndex = other.pageIndex))
-            documentRepository.updatePage(other.copy(pageIndex = page.pageIndex))
-            // Whichever of the two swapped pages now sits at index 0 (computed
-            // from the swap we just made, not re-read from reactive state).
-            val newFirstPageFile = when (0) {
-                other.pageIndex -> page.imageUri
-                page.pageIndex -> other.imageUri
-                else -> null
+            runCatching {
+                fileMutex.withLock {
+                    val other = pages[targetIdx]
+                    documentRepository.updatePage(page.copy(pageIndex = other.pageIndex))
+                    documentRepository.updatePage(other.copy(pageIndex = page.pageIndex))
+                    // Whichever of the two swapped pages now sits at index 0 (computed
+                    // from the swap we just made, not re-read from reactive state).
+                    val newFirstPageFile = when (0) {
+                        other.pageIndex -> page.imageUri
+                        page.pageIndex -> other.imageUri
+                        else -> null
+                    }
+                    newFirstPageFile?.let { FileUtils.generateThumbnail(appContext, documentId, File(it)) }
+                    touchDocument()
+                }
+            }.onFailure { e ->
+                _errors.emit(e.message ?: "Failed to reorder page")
             }
-            newFirstPageFile?.let { FileUtils.generateThumbnail(appContext, documentId, File(it)) }
-            touchDocument()
         }
     }
 
     fun deletePage(page: Page) {
         viewModelScope.launch {
-            documentRepository.deletePage(page)
-            File(page.imageUri).delete()
+            runCatching {
+                fileMutex.withLock {
+                    documentRepository.deletePage(page)
+                    File(page.imageUri).delete()
 
-            val remaining = uiState.value.pages.filter { it.id != page.id }.sortedBy { it.pageIndex }
-            if (remaining.isEmpty()) {
-                deleteDocument()
-                return@launch
-            }
-            // Renumber to stay contiguous/zero-based: otherwise a gap opens
-            // up wherever a page was deleted, and every "pageIndex == 0"
-            // check elsewhere (rotate/move's thumbnail-source logic) would
-            // silently stop matching the page that's actually displayed first.
-            remaining.forEachIndexed { index, remainingPage ->
-                if (remainingPage.pageIndex != index) {
-                    documentRepository.updatePage(remainingPage.copy(pageIndex = index))
+                    val remaining = uiState.value.pages.filter { it.id != page.id }.sortedBy { it.pageIndex }
+                    if (remaining.isEmpty()) {
+                        deleteDocumentLocked()
+                        return@withLock
+                    }
+                    // Renumber to stay contiguous/zero-based: otherwise a gap opens
+                    // up wherever a page was deleted, and every "pageIndex == 0"
+                    // check elsewhere (rotate/move's thumbnail-source logic) would
+                    // silently stop matching the page that's actually displayed first.
+                    remaining.forEachIndexed { index, remainingPage ->
+                        if (remainingPage.pageIndex != index) {
+                            documentRepository.updatePage(remainingPage.copy(pageIndex = index))
+                        }
+                    }
+                    uiState.value.document?.let { document ->
+                        documentRepository.updateDocument(
+                            document.copy(pageCount = remaining.size, updatedAt = System.currentTimeMillis())
+                        )
+                    }
+                    FileUtils.generateThumbnail(appContext, documentId, File(remaining.first().imageUri))
                 }
+            }.onFailure { e ->
+                _errors.emit(e.message ?: "Failed to delete page")
             }
-            uiState.value.document?.let { document ->
-                documentRepository.updateDocument(
-                    document.copy(pageCount = remaining.size, updatedAt = System.currentTimeMillis())
-                )
-            }
-            FileUtils.generateThumbnail(appContext, documentId, File(remaining.first().imageUri))
         }
     }
 
     fun deleteDocument() {
-        val document = uiState.value.document ?: return
         viewModelScope.launch {
-            documentRepository.deleteDocument(document)
-            FileUtils.documentDir(appContext, document.id).deleteRecursively()
-            FileUtils.thumbnailFile(appContext, document.id).delete()
-            isDeleted.value = true
+            runCatching {
+                fileMutex.withLock { deleteDocumentLocked() }
+            }.onFailure { e ->
+                _errors.emit(e.message ?: "Failed to delete document")
+            }
         }
+    }
+
+    /** Must only be called while holding [fileMutex]. */
+    private suspend fun deleteDocumentLocked() {
+        val document = uiState.value.document ?: return
+        documentRepository.deleteDocument(document)
+        FileUtils.documentDir(appContext, document.id).deleteRecursively()
+        FileUtils.thumbnailFile(appContext, document.id).delete()
+        isDeleted.value = true
     }
 
     fun setPendingSignature(bitmap: Bitmap) {
@@ -176,29 +213,32 @@ class DocumentDetailViewModel(
         viewModelScope.launch {
             isExporting.value = true
             try {
-                val pageFiles = state.pages.map { File(it.imageUri) }
-                val outputFile = File(FileUtils.documentDir(appContext, documentId), "export_${System.currentTimeMillis()}.pdf")
+                val outputFile = fileMutex.withLock {
+                    val pageFiles = state.pages.map { File(it.imageUri) }
+                    val fileName = "${FileUtils.sanitizeFileName(document.title)}.pdf"
+                    val exportFile = File(FileUtils.documentDir(appContext, documentId), fileName)
 
-                val signature = state.pendingSignature
-                    ?.takeIf { settings.signatureEnabled }
-                    ?.let { pending -> buildSignaturePlacement(pending, pageFiles) }
+                    val signature = state.pendingSignature
+                        ?.takeIf { settings.signatureEnabled }
+                        ?.let { pending -> buildSignaturePlacement(pending, pageFiles) }
 
-                pdfEngine.generatePdf(
-                    pageFiles,
-                    outputFile,
-                    PdfGenerationOptions(
-                        ocrEnabled = settings.ocrEnabled,
-                        signature = signature,
-                        passwordProtection = settings.password
-                            .takeIf { settings.passwordEnabled && it.isNotBlank() }
-                            ?.let { PasswordProtection(userPassword = it) },
-                        targetSizeBytes = if (settings.compressToTargetSize) {
-                            (settings.targetSizeMb * BYTES_PER_MB).toLong()
-                        } else {
-                            null
-                        },
-                    ),
-                )
+                    pdfEngine.generatePdf(
+                        pageFiles,
+                        exportFile,
+                        PdfGenerationOptions(
+                            ocrEnabled = settings.ocrEnabled,
+                            signature = signature,
+                            passwordProtection = settings.password
+                                .takeIf { settings.passwordEnabled && it.isNotBlank() }
+                                ?.let { PasswordProtection(userPassword = it) },
+                            targetSizeBytes = if (settings.compressToTargetSize) {
+                                (settings.targetSizeMb * BYTES_PER_MB).toLong()
+                            } else {
+                                null
+                            },
+                        ),
+                    )
+                }
 
                 documentRepository.updateDocument(
                     document.copy(pdfUri = outputFile.absolutePath, updatedAt = System.currentTimeMillis())
@@ -212,10 +252,12 @@ class DocumentDetailViewModel(
         }
     }
 
-    private fun buildSignaturePlacement(pending: PendingSignature, pageFiles: List<File>): SignaturePlacement? {
+    private suspend fun buildSignaturePlacement(pending: PendingSignature, pageFiles: List<File>): SignaturePlacement? {
         val pageFile = pageFiles.getOrNull(pending.pageIndex) ?: return null
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(pageFile.absolutePath, bounds)
+        val bounds = withContext(Dispatchers.IO) {
+            BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                .also { BitmapFactory.decodeFile(pageFile.absolutePath, it) }
+        }
         val width = bounds.outWidth / 3
         val height = (width * pending.bitmap.height / pending.bitmap.width.toFloat()).toInt().coerceAtLeast(1)
         val rect = Rect(
