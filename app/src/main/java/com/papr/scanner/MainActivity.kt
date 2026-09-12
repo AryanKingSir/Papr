@@ -58,6 +58,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        pendingScanTarget = restoreScanTarget(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             PaprTheme {
@@ -94,6 +95,36 @@ class MainActivity : ComponentActivity() {
             .addOnFailureListener { error ->
                 Log.e("Papr", "Failed to start scanner", error)
             }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        when (val target = pendingScanTarget) {
+            is ScanTarget.NewDocument -> outState.putString(KEY_SCAN_TARGET_TYPE, TYPE_NEW_DOCUMENT)
+            is ScanTarget.AppendPages -> {
+                outState.putString(KEY_SCAN_TARGET_TYPE, TYPE_APPEND_PAGES)
+                outState.putLong(KEY_DOCUMENT_ID, target.documentId)
+            }
+            is ScanTarget.ReplacePage -> {
+                outState.putString(KEY_SCAN_TARGET_TYPE, TYPE_REPLACE_PAGE)
+                outState.putLong(KEY_DOCUMENT_ID, target.documentId)
+                outState.putLong(KEY_PAGE_ID, target.pageId)
+                outState.putInt(KEY_PAGE_INDEX, target.pageIndex)
+            }
+        }
+    }
+
+    private fun restoreScanTarget(savedInstanceState: Bundle?): ScanTarget {
+        val bundle = savedInstanceState ?: return ScanTarget.NewDocument
+        return when (bundle.getString(KEY_SCAN_TARGET_TYPE)) {
+            TYPE_APPEND_PAGES -> ScanTarget.AppendPages(documentId = bundle.getLong(KEY_DOCUMENT_ID))
+            TYPE_REPLACE_PAGE -> ScanTarget.ReplacePage(
+                documentId = bundle.getLong(KEY_DOCUMENT_ID),
+                pageId = bundle.getLong(KEY_PAGE_ID),
+                pageIndex = bundle.getInt(KEY_PAGE_INDEX),
+            )
+            else -> ScanTarget.NewDocument
+        }
     }
 
     private fun handleScanResult(data: Intent?) {
@@ -189,4 +220,14 @@ class MainActivity : ComponentActivity() {
 
     private fun defaultTitle(timestamp: Long): String =
         "Scan " + SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(Date(timestamp))
+
+    private companion object {
+        const val KEY_SCAN_TARGET_TYPE = "pending_scan_target_type"
+        const val KEY_DOCUMENT_ID = "pending_scan_document_id"
+        const val KEY_PAGE_ID = "pending_scan_page_id"
+        const val KEY_PAGE_INDEX = "pending_scan_page_index"
+        const val TYPE_NEW_DOCUMENT = "new_document"
+        const val TYPE_APPEND_PAGES = "append_pages"
+        const val TYPE_REPLACE_PAGE = "replace_page"
+    }
 }
