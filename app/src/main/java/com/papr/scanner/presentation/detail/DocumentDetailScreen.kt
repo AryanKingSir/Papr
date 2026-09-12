@@ -14,7 +14,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Draw
+import androidx.compose.material.icons.filled.FindReplace
 import androidx.compose.material.icons.filled.IosShare
+import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.material.icons.automirrored.filled.RotateRight
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -50,7 +52,12 @@ import com.papr.scanner.presentation.detail.components.SignatureOverlayEditor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DocumentDetailScreen(documentId: Long, onBack: () -> Unit) {
+fun DocumentDetailScreen(
+    documentId: Long,
+    onBack: () -> Unit,
+    onAddPagesClick: () -> Unit,
+    onReplacePageClick: (pageId: Long, pageIndex: Int) -> Unit,
+) {
     val viewModel = paprViewModel { container ->
         DocumentDetailViewModel(documentId, container.documentRepository, container.pdfEngine, container.appContext)
     }
@@ -112,6 +119,9 @@ fun DocumentDetailScreen(documentId: Long, onBack: () -> Unit) {
                             isEditingTitle = false
                         }) { Text("Save") }
                     } else {
+                        IconButton(onClick = onAddPagesClick) {
+                            Icon(Icons.Filled.NoteAdd, contentDescription = "Add pages")
+                        }
                         IconButton(onClick = { showExportOptions = true }, enabled = uiState.pages.isNotEmpty()) {
                             Icon(Icons.Filled.IosShare, contentDescription = "Export")
                         }
@@ -155,6 +165,12 @@ fun DocumentDetailScreen(documentId: Long, onBack: () -> Unit) {
                 }
                 IconButton(onClick = { showSignatureEditor = true }, enabled = currentPage != null) {
                     Icon(Icons.Filled.Draw, contentDescription = "Sign page")
+                }
+                IconButton(
+                    onClick = { currentPage?.let { onReplacePageClick(it.id, it.pageIndex) } },
+                    enabled = currentPage != null,
+                ) {
+                    Icon(Icons.Filled.FindReplace, contentDescription = "Replace page")
                 }
                 IconButton(onClick = { pendingDeletePage = true }, enabled = currentPage != null) {
                     Icon(Icons.Filled.Delete, contentDescription = "Delete page")
