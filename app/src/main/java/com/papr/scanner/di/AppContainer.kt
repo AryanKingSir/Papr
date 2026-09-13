@@ -13,6 +13,7 @@ import com.papr.scanner.data.repository.DocumentRepositoryImpl
 import com.papr.scanner.pdf.BitmapPdfCompiler
 import com.papr.scanner.pdf.InvisibleTextLayerInjector
 import com.papr.scanner.pdf.OcrTextStamper
+import com.papr.scanner.pdf.PageTextExtractor
 import com.papr.scanner.pdf.PdfEngine
 import com.papr.scanner.pdf.SignatureStamper
 import com.papr.scanner.pdf.security.PdfEncryptor
@@ -48,6 +49,10 @@ class AppContainer(private val context: Context) {
             InvisibleTextLayerInjector(),
             PdfEncryptor(),
         )
+    }
+
+    val pageTextExtractor: PageTextExtractor by lazy {
+        PageTextExtractor(OcrTextStamper(), documentRepository)
     }
 
     val billingManager: BillingManager by lazy {

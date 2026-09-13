@@ -32,6 +32,9 @@ class OcrTextStamper {
         }
     }
 
+    /** The whole page's recognized text, in ML Kit's own natural reading order - for search indexing, not PDF stamping. */
+    suspend fun recognizePlainText(bitmap: Bitmap): String = recognizeText(bitmap).text
+
     private suspend fun recognizeText(bitmap: Bitmap): Text =
         suspendCancellableCoroutine { continuation ->
             recognizer.process(InputImage.fromBitmap(bitmap, 0))

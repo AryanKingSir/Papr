@@ -167,7 +167,8 @@ class MainActivity : ComponentActivity() {
         val pages = pageFiles.mapIndexed { index, file ->
             Page(id = 0, documentId = documentId, pageIndex = index, imageUri = file.absolutePath, extractedText = null)
         }
-        container.documentRepository.insertPages(pages)
+        val pageIds = container.documentRepository.insertPages(pages)
+        startTextExtraction(container, pages.zip(pageIds) { page, id -> page.copy(id = id) })
 
         val thumbnail = FileUtils.generateThumbnail(this@MainActivity, documentId, pageFiles.first())
         container.documentRepository.updateDocument(
@@ -196,7 +197,8 @@ class MainActivity : ComponentActivity() {
         val newPages = pageFiles.mapIndexed { offset, file ->
             Page(id = 0, documentId = documentId, pageIndex = startIndex + offset, imageUri = file.absolutePath, extractedText = null)
         }
-        container.documentRepository.insertPages(newPages)
+        val newPageIds = container.documentRepository.insertPages(newPages)
+        startTextExtraction(container, newPages.zip(newPageIds) { page, id -> page.copy(id = id) })
         container.documentRepository.updateDocument(
             document.copy(pageCount = existingPages.size + newPages.size, updatedAt = System.currentTimeMillis())
         )
@@ -210,7 +212,9 @@ class MainActivity : ComponentActivity() {
 
         val newFile = container.documentScannerManager.importScannedPages(target.documentId, pageUris.take(1)).first()
         withContext(Dispatchers.IO) { File(page.imageUri).delete() }
-        container.documentRepository.updatePage(page.copy(imageUri = newFile.absolutePath))
+        val updatedPage = page.copy(imageUri = newFile.absolutePath)
+        container.documentRepository.updatePage(updatedPage)
+        startTextExtraction(container, listOf(updatedPage))
 
         if (target.pageIndex == 0) {
             FileUtils.generateThumbnail(this@MainActivity, target.documentId, newFile)
@@ -220,6 +224,13 @@ class MainActivity : ComponentActivity() {
 
     private fun defaultTitle(timestamp: Long): String =
         "Scan " + SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(Date(timestamp))
+
+    /** Fires OCR for these pages in the background, independent of whatever coroutine is already saving/navigating - so scanning isn't held up waiting for it. */
+    private fun startTextExtraction(container: AppContainer, pages: List<Page>) {
+        lifecycleScope.launch {
+            pages.forEach { page -> container.pageTextExtractor.extractAndSave(page) }
+        }
+    }
 
     private companion object {
         const val KEY_SCAN_TARGET_TYPE = "pending_scan_target_type"
