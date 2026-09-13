@@ -87,4 +87,16 @@ object FileUtils {
             bitmap.recycle()
             destination
         }
+
+    /** Decodes a bitmap capped at [maxDimension] on its longest side, to bound memory for a one-off read (e.g. OCR). */
+    suspend fun decodeDownsampled(file: File, maxDimension: Int): Bitmap = withContext(Dispatchers.IO) {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, bounds)
+        val longestSide = maxOf(bounds.outWidth, bounds.outHeight)
+        val sampleSize = if (longestSide > maxDimension) maxOf(1, longestSide / maxDimension) else 1
+        BitmapFactory.decodeFile(
+            file.absolutePath,
+            BitmapFactory.Options().apply { inSampleSize = sampleSize },
+        ) ?: throw IOException("Failed to decode bitmap: ${file.absolutePath}")
+    }
 }
