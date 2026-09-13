@@ -1,13 +1,12 @@
 package com.papr.scanner.pdf
 
 import android.graphics.Bitmap
-import android.graphics.Rect
 import com.papr.scanner.pdf.security.PdfEncryptor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
-data class SignaturePlacement(val bitmap: Bitmap, val pageIndex: Int, val rect: Rect)
+data class SignaturePlacement(val bitmap: Bitmap, val pageIndex: Int)
 
 /** [ownerPassword] defaults to [userPassword] when blank, per the Standard Security Handler. */
 data class PasswordProtection(val userPassword: String, val ownerPassword: String = "")
@@ -34,18 +33,29 @@ class PdfEngine(
     ): File = withContext(Dispatchers.IO) {
         val ocrElementsByPage = mutableMapOf<Int, List<OcrTextElement>>()
 
-        bitmapPdfCompiler.compile(pageFiles, outputFile, options.targetSizeBytes) { canvas, bitmap, pageIndex ->
+        bitmapPdfCompiler.compile(pageFiles, outputFile, options.targetSizeBytes) { canvas, bitmap, pageIndex, pageWidthPx, pageHeightPx ->
             if (options.ocrEnabled) {
-                // Injected as raw PDF operators, bypassing Canvas's page-scale transform,
-                // so bitmap-pixel coordinates must be scaled to PDF points explicitly here.
+                // Injected as raw PDF operators, bypassing Canvas entirely - so unlike
+                // the signature below, this gets none of BitmapPdfCompiler's own
+                // scale/translate for free and has to redo both by hand:
+                //  - offset by the same centering translate the page's bitmap got,
+                //    since OcrTextStamper's coordinates are relative to that bitmap;
+                //  - flip Y: OcrTextElement.y comes from a top-down Android bounding
+                //    box, but PDF space is bottom-up.
                 val scale = BitmapPdfCompiler.POINTS_PER_PIXEL
+                val offsetXPx = (pageWidthPx - bitmap.width) / 2f
+                val offsetYPx = (pageHeightPx - bitmap.height) / 2f
                 ocrElementsByPage[pageIndex] = ocrTextStamper.recognize(bitmap).map { element ->
-                    element.copy(x = element.x * scale, y = element.y * scale, fontSize = element.fontSize * scale)
+                    element.copy(
+                        x = (element.x + offsetXPx) * scale,
+                        y = (pageHeightPx - (element.y + offsetYPx)) * scale,
+                        fontSize = element.fontSize * scale,
+                    )
                 }
             }
             options.signature?.let { placement ->
                 if (placement.pageIndex == pageIndex) {
-                    signatureStamper.stamp(canvas, placement.bitmap, placement.rect)
+                    signatureStamper.stamp(canvas, placement.bitmap, bitmap.width, bitmap.height)
                 }
             }
         }

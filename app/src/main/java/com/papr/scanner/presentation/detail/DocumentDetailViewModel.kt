@@ -2,8 +2,6 @@ package com.papr.scanner.presentation.detail
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Rect
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.papr.scanner.core.FileUtils
@@ -222,7 +220,7 @@ class DocumentDetailViewModel(
 
                     val signature = state.pendingSignature
                         ?.takeIf { settings.signatureEnabled }
-                        ?.let { pending -> buildSignaturePlacement(pending, pageFiles) }
+                        ?.let { pending -> SignaturePlacement(pending.bitmap, pending.pageIndex) }
 
                     pdfEngine.generatePdf(
                         pageFiles,
@@ -254,23 +252,6 @@ class DocumentDetailViewModel(
         }
     }
 
-    private suspend fun buildSignaturePlacement(pending: PendingSignature, pageFiles: List<File>): SignaturePlacement? {
-        val pageFile = pageFiles.getOrNull(pending.pageIndex) ?: return null
-        val bounds = withContext(Dispatchers.IO) {
-            BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                .also { BitmapFactory.decodeFile(pageFile.absolutePath, it) }
-        }
-        val width = bounds.outWidth / 3
-        val height = (width * pending.bitmap.height / pending.bitmap.width.toFloat()).toInt().coerceAtLeast(1)
-        val rect = Rect(
-            bounds.outWidth - width - MARGIN_PX,
-            bounds.outHeight - height - MARGIN_PX,
-            bounds.outWidth - MARGIN_PX,
-            bounds.outHeight - MARGIN_PX,
-        )
-        return SignaturePlacement(pending.bitmap, pending.pageIndex, rect)
-    }
-
     /** Bumps updatedAt so the home grid's thumbnail (same file path, new bytes) also refreshes when we return to it. */
     private suspend fun touchDocument() {
         val document = uiState.value.document ?: return
@@ -278,7 +259,6 @@ class DocumentDetailViewModel(
     }
 
     private companion object {
-        const val MARGIN_PX = 40
         const val BYTES_PER_MB = 1024 * 1024
     }
 }
