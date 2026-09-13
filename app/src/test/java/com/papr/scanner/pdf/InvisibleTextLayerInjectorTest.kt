@@ -67,13 +67,14 @@ class InvisibleTextLayerInjectorTest {
         val file = writeFixture()
         val originalLength = file.length()
 
-        injector.inject(file, mapOf(0 to listOf(OcrTextElement("Hello", 10f, 20f, 12f))))
+        injector.inject(file, mapOf(0 to listOf(OcrTextElement("Hello", 10f, 20f, 12f, 50f))))
 
         val result = String(file.readBytes(), latin1)
 
         assertTrue("expected appended bytes", file.length() > originalLength)
         assertTrue("expected a Helvetica font object", result.contains("/BaseFont /Helvetica"))
         assertTrue("expected invisible text render mode", result.contains("3 Tr"))
+        assertTrue("expected a horizontal-scale Tz operator", result.contains(" Tz"))
         assertTrue("expected the recognized text as a Tj operand", result.contains("(Hello) Tj"))
         assertTrue("expected page 2 to be redefined with an updated /Contents array", Regex("/Contents \\[4 0 R \\d+ 0 R]").containsMatchIn(result))
         assertTrue("expected the page's Resources to reference the new font", result.contains("/Font <</F1"))
@@ -85,7 +86,7 @@ class InvisibleTextLayerInjectorTest {
         val file = writeFixture()
         val originalBytes = file.readBytes()
 
-        injector.inject(file, mapOf(0 to listOf(OcrTextElement("日本語", 10f, 20f, 12f))))
+        injector.inject(file, mapOf(0 to listOf(OcrTextElement("日本語", 10f, 20f, 12f, 50f))))
 
         assertEquals(originalBytes.toList(), file.readBytes().toList())
     }
@@ -94,7 +95,7 @@ class InvisibleTextLayerInjectorTest {
     fun `escapes parentheses and backslashes in recognized text`() {
         val file = writeFixture()
 
-        injector.inject(file, mapOf(0 to listOf(OcrTextElement("a(b)c\\d", 0f, 0f, 12f))))
+        injector.inject(file, mapOf(0 to listOf(OcrTextElement("a(b)c\\d", 0f, 0f, 12f, 50f))))
 
         val result = String(file.readBytes(), latin1)
         assertTrue(result.contains("(a\\(b\\)c\\\\d) Tj"))

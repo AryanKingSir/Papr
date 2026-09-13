@@ -50,6 +50,7 @@ class PdfEngine(
                         x = (element.x + offsetXPx) * scale,
                         y = (pageHeightPx - (element.y + offsetYPx)) * scale,
                         fontSize = element.fontSize * scale,
+                        width = element.width * scale,
                     )
                 }
             }

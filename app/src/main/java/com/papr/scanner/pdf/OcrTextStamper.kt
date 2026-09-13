@@ -9,7 +9,7 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
 
-data class OcrTextElement(val text: String, val x: Float, val y: Float, val fontSize: Float)
+data class OcrTextElement(val text: String, val x: Float, val y: Float, val fontSize: Float, val width: Float)
 
 /**
  * Runs on-device text recognition and returns each element's text with its
@@ -28,6 +28,7 @@ class OcrTextStamper {
                 x = box.left.toFloat(),
                 y = box.bottom.toFloat(),
                 fontSize = box.height().toFloat(),
+                width = box.width().toFloat(),
             )
         }
     }

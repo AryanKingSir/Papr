@@ -55,7 +55,7 @@ class InvisibleTextLayerInjector {
         }
 
         val fontObjNum = nextObjNum++
-        appendObject(fontObjNum, "<</Type /Font /Subtype /Type1 /BaseFont /Helvetica>>")
+        appendObject(fontObjNum, "<</Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding>>")
 
         for ((pageIndex, elements) in encodableByPage) {
             if (elements.isEmpty()) continue
@@ -103,8 +103,10 @@ class InvisibleTextLayerInjector {
     private fun buildContentStream(elements: List<OcrTextElement>): String {
         val builder = StringBuilder()
         for (element in elements) {
+            val horizontalScale = horizontalScalePercent(element.text, element.fontSize, element.width)
             builder.append("BT\n3 Tr\n")
             builder.append("/F1 ${formatNumber(element.fontSize)} Tf\n")
+            builder.append("${formatNumber(horizontalScale)} Tz\n")
             builder.append("1 0 0 1 ${formatNumber(element.x)} ${formatNumber(element.y)} Tm\n")
             builder.append("(${escapePdfString(element.text)}) Tj\nET\n")
         }
@@ -136,4 +138,48 @@ class InvisibleTextLayerInjector {
         private val OBJ_REF_REGEX = Regex("(\\d+)\\s+0\\s+R")
         private val CONTENTS_REGEX = Regex("/Contents (\\d+) 0 R")
     }
+}
+
+/**
+ * Real Adobe Helvetica character widths (1/1000 em units) for the printable
+ * ASCII range (32-126), fetched from the published Helvetica.afm font
+ * metrics - covers the large majority of real-world OCR'd English text.
+ * Index 0 is code 32 (space).
+ */
+private val HELVETICA_ASCII_WIDTHS = intArrayOf(
+    278, 278, 355, 556, 556, 889, 667, 222, 333, 333, 389, 584, 278, 333, 278, 278,
+    556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556,
+    1015, 667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778,
+    667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278, 278, 278, 469, 556,
+    222, 556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556,
+    556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584,
+)
+
+private const val HELVETICA_FIRST_CODE = 32
+
+/** The real average of [HELVETICA_ASCII_WIDTHS], used as a fallback for any character outside 32-126 (e.g. accented Latin). */
+private const val HELVETICA_AVERAGE_WIDTH = 526
+
+private const val MIN_HORIZONTAL_SCALE = 25f
+private const val MAX_HORIZONTAL_SCALE = 400f
+
+/** Helvetica's width for [code] (1/1000 em units), or the table's average outside the mapped ASCII range. */
+internal fun helveticaWidth(code: Int): Int {
+    val index = code - HELVETICA_FIRST_CODE
+    return if (index in HELVETICA_ASCII_WIDTHS.indices) HELVETICA_ASCII_WIDTHS[index] else HELVETICA_AVERAGE_WIDTH
+}
+
+/**
+ * The PDF `Tz` horizontal-scaling percentage that makes [text], rendered in
+ * Helvetica at [fontSize], visually span [targetWidth] instead of its
+ * natural width - so invisible selectable text lines up with the real
+ * printed word underneath it, which is essentially never actually set in
+ * Helvetica. Clamped to a sane range so a bad OCR box can't produce
+ * illegible-if-visible text.
+ */
+internal fun horizontalScalePercent(text: String, fontSize: Float, targetWidth: Float): Float {
+    val totalUnits = text.map { helveticaWidth(it.code) }.sum()
+    val naturalWidth = totalUnits / 1000f * fontSize
+    if (naturalWidth <= 0f) return 100f
+    return (targetWidth / naturalWidth * 100f).coerceIn(MIN_HORIZONTAL_SCALE, MAX_HORIZONTAL_SCALE)
 }
