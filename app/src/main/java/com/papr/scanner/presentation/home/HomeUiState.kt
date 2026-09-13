@@ -7,4 +7,6 @@ data class HomeUiState(
     val searchQuery: String = "",
     val folders: List<String> = emptyList(),
     val selectedFolder: String? = null,
+    val selectedDateRange: LongRange? = null,
+    val contentMatchedIds: Set<Long> = emptySet(),
 )
