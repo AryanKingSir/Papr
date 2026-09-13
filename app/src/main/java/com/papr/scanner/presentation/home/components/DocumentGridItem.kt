@@ -32,6 +32,7 @@ fun DocumentGridItem(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
+    isContentMatch: Boolean = false,
 ) {
     Column(
         modifier = modifier
@@ -63,6 +64,22 @@ fun DocumentGridItem(
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                 )
+            }
+            if (isContentMatch) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp),
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                ) {
+                    Text(
+                        text = "Matched in scanned text",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
             }
         }
         Text(

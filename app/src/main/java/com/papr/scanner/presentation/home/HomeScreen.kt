@@ -36,6 +36,8 @@ import androidx.compose.ui.unit.dp
 import com.papr.scanner.R
 import com.papr.scanner.domain.model.Document
 import com.papr.scanner.presentation.common.paprViewModel
+import com.papr.scanner.presentation.home.components.DateRangeChip
+import com.papr.scanner.presentation.home.components.DateRangeFilterButton
 import com.papr.scanner.presentation.home.components.DocumentGridItem
 import com.papr.scanner.presentation.home.components.DocumentSearchBar
 import com.papr.scanner.presentation.home.components.EmptyState
@@ -67,6 +69,7 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    DateRangeFilterButton(onDateRangeSelected = viewModel::onDateRangeSelected)
                     IconButton(onClick = onUpgradeClick) {
                         Icon(Icons.Default.WorkspacePremium, contentDescription = "Go Pro")
                     }
@@ -81,6 +84,13 @@ fun HomeScreen(
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding)) {
             DocumentSearchBar(query = uiState.searchQuery, onQueryChange = viewModel::onSearchQueryChange)
+            uiState.selectedDateRange?.let { range ->
+                DateRangeChip(
+                    range = range,
+                    onClear = { viewModel.onDateRangeSelected(null) },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
             FilterChipsRow(
                 folders = uiState.folders,
                 selectedFolder = uiState.selectedFolder,
@@ -102,6 +112,7 @@ fun HomeScreen(
                             document = document,
                             onClick = { onDocumentClick(document.id) },
                             onLongClick = { pendingDelete = document },
+                            isContentMatch = document.id in uiState.contentMatchedIds,
                         )
                     }
                 }
