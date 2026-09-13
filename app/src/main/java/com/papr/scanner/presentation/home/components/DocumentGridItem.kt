@@ -59,7 +59,7 @@ fun DocumentGridItem(
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
             ) {
                 Text(
-                    text = "${document.pageCount}p",
+                    text = if (document.pageCount == 1) "1 Page" else "${document.pageCount} Pages",
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                 )
