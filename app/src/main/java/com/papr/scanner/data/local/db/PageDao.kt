@@ -13,6 +13,9 @@ interface PageDao {
     @Query("SELECT * FROM pages WHERE documentId = :documentId ORDER BY pageIndex ASC")
     fun getForDocument(documentId: Long): Flow<List<PageEntity>>
 
+    @Query("SELECT * FROM pages")
+    fun getAll(): Flow<List<PageEntity>>
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(page: PageEntity): Long
 

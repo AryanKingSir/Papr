@@ -23,6 +23,9 @@ class DocumentRepositoryImpl(
     override fun getPagesForDocument(documentId: Long): Flow<List<Page>> =
         pageDao.getForDocument(documentId).map { entities -> entities.map { it.toDomain() } }
 
+    override fun getAllPages(): Flow<List<Page>> =
+        pageDao.getAll().map { entities -> entities.map { it.toDomain() } }
+
     override suspend fun insertDocument(document: Document): Long =
         documentDao.insert(document.toEntity())
 

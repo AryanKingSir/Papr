@@ -8,6 +8,7 @@ interface DocumentRepository {
     fun getAllDocuments(): Flow<List<Document>>
     fun getDocumentById(id: Long): Flow<Document?>
     fun getPagesForDocument(documentId: Long): Flow<List<Page>>
+    fun getAllPages(): Flow<List<Page>>
 
     suspend fun insertDocument(document: Document): Long
     suspend fun updateDocument(document: Document)
