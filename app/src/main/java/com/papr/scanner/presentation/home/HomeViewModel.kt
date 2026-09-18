@@ -7,10 +7,12 @@ import com.papr.scanner.core.FileUtils
 import com.papr.scanner.data.repository.DocumentRepository
 import com.papr.scanner.domain.model.Document
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -23,8 +25,22 @@ class HomeViewModel(
     private val searchQuery = MutableStateFlow("")
     private val selectedFolder = MutableStateFlow<String?>(null)
     private val selectedDateRange = MutableStateFlow<LongRange?>(null)
+    private val isSelectionMode = MutableStateFlow(false)
+    private val selectedDocumentIds = MutableStateFlow<List<Long>>(emptyList())
 
-    val uiState: StateFlow<HomeUiState> = combine(
+    private data class SearchResults(
+        val documents: List<Document>,
+        val searchQuery: String,
+        val folders: List<String>,
+        val selectedFolder: String?,
+        val selectedDateRange: LongRange?,
+        val contentMatchedIds: Set<Long>,
+    )
+
+    // Kept as its own 5-flow combine (the direct combine() overloads only go up to 5
+    // arguments) and merged with the two selection-state flows below in a second stage,
+    // rather than trying to combine all 7 sources in one call.
+    private val searchResults: Flow<SearchResults> = combine(
         documentRepository.getAllDocuments(),
         documentRepository.getAllPages(),
         searchQuery,
@@ -56,13 +72,30 @@ class HomeViewModel(
             }.sortedBy { document -> if (document.id in contentMatchedIds) 1 else 0 }
         }
 
-        HomeUiState(
+        SearchResults(
             documents = visible,
             searchQuery = query,
             folders = folders,
             selectedFolder = folder,
             selectedDateRange = dateRange,
             contentMatchedIds = contentMatchedIds,
+        )
+    }
+
+    val uiState: StateFlow<HomeUiState> = combine(
+        searchResults,
+        isSelectionMode,
+        selectedDocumentIds,
+    ) { results, selectionMode, selectedIds ->
+        HomeUiState(
+            documents = results.documents,
+            searchQuery = results.searchQuery,
+            folders = results.folders,
+            selectedFolder = results.selectedFolder,
+            selectedDateRange = results.selectedDateRange,
+            contentMatchedIds = results.contentMatchedIds,
+            isSelectionMode = selectionMode,
+            selectedDocumentIds = selectedIds,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
@@ -78,13 +111,40 @@ class HomeViewModel(
         selectedDateRange.value = range
     }
 
-    fun deleteDocument(document: Document) {
+    fun onDocumentLongPress(document: Document) {
+        isSelectionMode.value = true
+        if (document.id !in selectedDocumentIds.value) {
+            selectedDocumentIds.value = selectedDocumentIds.value + document.id
+        }
+    }
+
+    fun toggleSelection(documentId: Long) {
+        val current = selectedDocumentIds.value
+        selectedDocumentIds.value = if (documentId in current) current - documentId else current + documentId
+    }
+
+    fun clearSelection() {
+        isSelectionMode.value = false
+        selectedDocumentIds.value = emptyList()
+    }
+
+    fun deleteSelected() {
         viewModelScope.launch {
-            documentRepository.deleteDocument(document) // Room cascade-deletes the page rows
-            withContext(Dispatchers.IO) {
-                FileUtils.documentDir(appContext, document.id).deleteRecursively()
-                FileUtils.thumbnailFile(appContext, document.id).delete()
+            // Looked up by ID directly rather than filtered from the current uiState -
+            // a document can stay "selected" while an active search/folder/date filter
+            // hides it from view, and it still needs to be deleted correctly.
+            selectedDocumentIds.value.forEach { id ->
+                documentRepository.getDocumentById(id).first()?.let { deleteDocumentFiles(it) }
             }
+            clearSelection()
+        }
+    }
+
+    private suspend fun deleteDocumentFiles(document: Document) {
+        documentRepository.deleteDocument(document) // Room cascade-deletes the page rows
+        withContext(Dispatchers.IO) {
+            FileUtils.documentDir(appContext, document.id).deleteRecursively()
+            FileUtils.thumbnailFile(appContext, document.id).delete()
         }
     }
 }

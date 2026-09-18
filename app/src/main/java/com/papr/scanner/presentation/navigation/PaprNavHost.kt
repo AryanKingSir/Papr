@@ -33,6 +33,7 @@ fun PaprNavHost(
                 onDocumentClick = { id -> navController.navigate(Screen.DocumentDetail.createRoute(id)) },
                 onScanClick = onScanClick,
                 onUpgradeClick = { showPaywall = true },
+                onMergeClick = { ids -> navController.navigate(Screen.MergeConfirm.createRoute(ids)) },
             )
 
             if (showPaywall) {

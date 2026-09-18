@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -33,6 +35,8 @@ fun DocumentGridItem(
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
     isContentMatch: Boolean = false,
+    selectionMode: Boolean = false,
+    isSelected: Boolean = false,
 ) {
     Column(
         modifier = modifier
@@ -79,6 +83,17 @@ fun DocumentGridItem(
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     )
+                }
+            }
+            if (selectionMode) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                ) {
+                    Checkbox(checked = isSelected, onCheckedChange = null, modifier = Modifier.padding(2.dp))
                 }
             }
         }

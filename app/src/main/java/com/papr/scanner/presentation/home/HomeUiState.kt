@@ -9,4 +9,6 @@ data class HomeUiState(
     val selectedFolder: String? = null,
     val selectedDateRange: LongRange? = null,
     val contentMatchedIds: Set<Long> = emptySet(),
+    val isSelectionMode: Boolean = false,
+    val selectedDocumentIds: List<Long> = emptyList(),
 )
