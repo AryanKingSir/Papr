@@ -7,4 +7,9 @@ sealed class Screen(val route: String) {
         const val ARG_DOCUMENT_ID = "documentId"
         fun createRoute(documentId: Long) = "document/$documentId"
     }
+
+    data object MergeConfirm : Screen("merge/{documentIds}") {
+        const val ARG_DOCUMENT_IDS = "documentIds"
+        fun createRoute(documentIds: List<Long>) = "merge/${documentIds.joinToString(",")}"
+    }
 }

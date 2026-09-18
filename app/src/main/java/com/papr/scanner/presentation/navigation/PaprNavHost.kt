@@ -14,6 +14,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.papr.scanner.presentation.detail.DocumentDetailScreen
 import com.papr.scanner.presentation.home.HomeScreen
+import com.papr.scanner.presentation.merge.MergeConfirmScreen
 import com.papr.scanner.presentation.paywall.ProUpgradeSheet
 
 @Composable
@@ -53,6 +54,26 @@ fun PaprNavHost(
                     onBack = { navController.popBackStack() },
                     onAddPagesClick = { onAddPagesClick(documentId) },
                     onReplacePageClick = { pageId, pageIndex -> onReplacePageClick(documentId, pageId, pageIndex) },
+                )
+            }
+        }
+        composable(
+            route = Screen.MergeConfirm.route,
+            arguments = listOf(navArgument(Screen.MergeConfirm.ARG_DOCUMENT_IDS) { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val idsArg = backStackEntry.arguments?.getString(Screen.MergeConfirm.ARG_DOCUMENT_IDS)
+            val documentIds = idsArg?.split(",")?.mapNotNull { it.toLongOrNull() }.orEmpty()
+            if (documentIds.size < 2) {
+                LaunchedEffect(Unit) { navController.popBackStack() }
+            } else {
+                MergeConfirmScreen(
+                    documentIds = documentIds,
+                    onBack = { navController.popBackStack() },
+                    onMergeComplete = { newDocumentId ->
+                        navController.navigate(Screen.DocumentDetail.createRoute(newDocumentId)) {
+                            popUpTo(Screen.MergeConfirm.route) { inclusive = true }
+                        }
+                    },
                 )
             }
         }
