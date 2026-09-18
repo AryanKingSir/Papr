@@ -8,6 +8,7 @@ import com.papr.scanner.billing.RealPlayBillingClient
 import com.papr.scanner.core.Constants
 import com.papr.scanner.data.local.datastore.UserPreferencesRepository
 import com.papr.scanner.data.local.db.PaprDatabase
+import com.papr.scanner.data.repository.DocumentMerger
 import com.papr.scanner.data.repository.DocumentRepository
 import com.papr.scanner.data.repository.DocumentRepositoryImpl
 import com.papr.scanner.pdf.BitmapPdfCompiler
@@ -31,6 +32,10 @@ class AppContainer(private val context: Context) {
 
     val documentRepository: DocumentRepository by lazy {
         DocumentRepositoryImpl(database.documentDao(), database.pageDao())
+    }
+
+    val documentMerger: DocumentMerger by lazy {
+        DocumentMerger(documentRepository, context)
     }
 
     val userPreferencesRepository: UserPreferencesRepository by lazy {
