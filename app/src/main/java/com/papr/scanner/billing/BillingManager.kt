@@ -1,7 +1,9 @@
 package com.papr.scanner.billing
 
 import android.app.Activity
+import android.util.Log
 import com.papr.scanner.data.local.datastore.UserPreferencesRepository
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -35,7 +37,15 @@ class BillingManager(
     private val productId: String,
     // Injectable so tests can pass a TestScope and drive this deterministically
     // with virtual time, instead of racing a real background dispatcher.
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    // SupervisorJob only isolates sibling coroutines from each other - it
+    // doesn't stop an exception from propagating and killing the process, so
+    // this also needs its own handler since this scope lives for the app's
+    // whole lifetime, independent of any screen.
+    private val scope: CoroutineScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Default + CoroutineExceptionHandler { _, throwable ->
+            Log.e("Papr", "Unhandled billing error", throwable)
+        }
+    ),
 ) {
     private val _state = MutableStateFlow<BillingState>(BillingState.Disconnected)
     val state: StateFlow<BillingState> = _state.asStateFlow()
