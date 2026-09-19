@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Draw
@@ -27,6 +28,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -139,10 +142,23 @@ fun DocumentDetailScreen(
                 pages = uiState.pages,
                 currentPageIndex = uiState.currentPageIndex,
                 onPageChanged = viewModel::selectPage,
+                isMarkingConfidential = uiState.isMarkingConfidential,
+                onMarkStrokeAdded = viewModel::addConfidentialMarkStroke,
+                onMarkStrokeErased = viewModel::eraseConfidentialMarkStroke,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
             )
+
+            if (uiState.isMarkingConfidential) {
+                Text(
+                    text = "Drag to cover content, tap a mark to remove it. Hidden text may still be found by " +
+                        "search or by copying text from an exported PDF.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
 
             PageThumbnailStrip(
                 pages = uiState.pages,
@@ -165,6 +181,13 @@ fun DocumentDetailScreen(
                 }
                 IconButton(onClick = { showSignatureEditor = true }, enabled = currentPage != null) {
                     Icon(Icons.Filled.Draw, contentDescription = "Sign page")
+                }
+                IconButton(onClick = { viewModel.toggleMarkingConfidential() }, enabled = currentPage != null) {
+                    Icon(
+                        Icons.Filled.Brush,
+                        contentDescription = "Mark confidential",
+                        tint = if (uiState.isMarkingConfidential) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                    )
                 }
                 IconButton(
                     onClick = { currentPage?.let { onReplacePageClick(it.id, it.pageIndex) } },

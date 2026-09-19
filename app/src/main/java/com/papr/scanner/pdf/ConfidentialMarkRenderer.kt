@@ -5,6 +5,8 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
+import androidx.core.graphics.toColorInt
+import androidx.core.graphics.withClip
 import com.papr.scanner.domain.model.ConfidentialMarkStroke
 
 class ConfidentialMarkRenderer {
@@ -23,7 +25,7 @@ class ConfidentialMarkRenderer {
         }
         val backgroundPaint = Paint().apply {
             style = Paint.Style.FILL
-            color = Color.parseColor(BACKGROUND_COLOR_HEX)
+            color = BACKGROUND_COLOR_HEX.toColorInt()
             isAntiAlias = true
         }
         val textPaint = Paint().apply {
@@ -49,11 +51,10 @@ class ConfidentialMarkRenderer {
             val bounds = RectF()
             fillPath.computeBounds(bounds, true)
 
-            canvas.save()
-            canvas.clipPath(fillPath)
-            canvas.drawRect(bounds, backgroundPaint)
-            drawTiledLabel(canvas, bounds, textPaint)
-            canvas.restore()
+            canvas.withClip(fillPath) {
+                drawRect(bounds, backgroundPaint)
+                drawTiledLabel(this, bounds, textPaint)
+            }
         }
     }
 

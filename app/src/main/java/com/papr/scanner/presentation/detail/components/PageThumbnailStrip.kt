@@ -5,7 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -35,10 +37,7 @@ fun PageThumbnailStrip(
     ) {
         items(pages, key = { it.id }) { page ->
             val isSelected = page.pageIndex == currentPageIndex
-            PageImage(
-                file = File(page.imageUri),
-                contentDescription = "Page ${page.pageIndex + 1}",
-                contentScale = ContentScale.Crop,
+            Box(
                 modifier = Modifier
                     .width(56.dp)
                     .height(72.dp)
@@ -52,7 +51,25 @@ fun PageThumbnailStrip(
                         RoundedCornerShape(8.dp),
                     )
                     .clickable { onPageSelected(page.pageIndex) },
-            )
+            ) {
+                PageImage(
+                    file = File(page.imageUri),
+                    contentDescription = "Page ${page.pageIndex + 1}",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                if (page.confidentialMarks.isNotEmpty()) {
+                    ConfidentialMarkOverlay(
+                        imageFile = File(page.imageUri),
+                        marks = page.confidentialMarks,
+                        editingEnabled = false,
+                        crop = true,
+                        onStrokeAdded = {},
+                        onStrokeErased = {},
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
         }
     }
 }
