@@ -7,6 +7,7 @@ import com.papr.scanner.billing.BillingManager
 import com.papr.scanner.billing.RealPlayBillingClient
 import com.papr.scanner.core.Constants
 import com.papr.scanner.data.local.datastore.UserPreferencesRepository
+import com.papr.scanner.data.local.db.MIGRATION_1_2
 import com.papr.scanner.data.local.db.PaprDatabase
 import com.papr.scanner.data.repository.DocumentMerger
 import com.papr.scanner.data.repository.DocumentRepository
@@ -27,7 +28,9 @@ class AppContainer(private val context: Context) {
     val appContext: Context get() = context
 
     private val database: PaprDatabase by lazy {
-        Room.databaseBuilder(context, PaprDatabase::class.java, PaprDatabase.NAME).build()
+        Room.databaseBuilder(context, PaprDatabase::class.java, PaprDatabase.NAME)
+            .addMigrations(MIGRATION_1_2)
+            .build()
     }
 
     val documentRepository: DocumentRepository by lazy {

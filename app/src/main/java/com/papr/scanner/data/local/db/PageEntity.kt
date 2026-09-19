@@ -24,4 +24,5 @@ data class PageEntity(
     val pageIndex: Int,
     val imageUri: String,
     val extractedText: String?,
+    val confidentialMarks: String? = null,
 )

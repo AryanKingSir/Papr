@@ -6,6 +6,8 @@ import com.papr.scanner.data.local.db.PageDao
 import com.papr.scanner.data.local.db.PageEntity
 import com.papr.scanner.domain.model.Document
 import com.papr.scanner.domain.model.Page
+import com.papr.scanner.domain.model.decodeMarkStrokes
+import com.papr.scanner.domain.model.encodeMarkStrokes
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -76,6 +78,7 @@ private fun PageEntity.toDomain() = Page(
     pageIndex = pageIndex,
     imageUri = imageUri,
     extractedText = extractedText,
+    confidentialMarks = decodeMarkStrokes(confidentialMarks),
 )
 
 private fun Page.toEntity() = PageEntity(
@@ -84,4 +87,5 @@ private fun Page.toEntity() = PageEntity(
     pageIndex = pageIndex,
     imageUri = imageUri,
     extractedText = extractedText,
+    confidentialMarks = encodeMarkStrokes(confidentialMarks).ifEmpty { null },
 )

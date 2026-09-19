@@ -6,4 +6,5 @@ data class Page(
     val pageIndex: Int,
     val imageUri: String,
     val extractedText: String?,
+    val confidentialMarks: List<ConfidentialMarkStroke> = emptyList(),
 )
