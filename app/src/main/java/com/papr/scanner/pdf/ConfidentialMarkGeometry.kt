@@ -1,5 +1,9 @@
 package com.papr.scanner.pdf
 
+import com.papr.scanner.domain.model.ConfidentialMarkStroke
+import com.papr.scanner.domain.model.NormalizedPoint
+import kotlin.math.sqrt
+
 /** Fraction of the page's width used as the confidential-mark stroke's on-screen/export width. */
 internal const val CONFIDENTIAL_MARK_STROKE_WIDTH_FRACTION = 0.04f
 
@@ -33,4 +37,27 @@ internal fun fittedImageBounds(
         width = width,
         height = height,
     )
+}
+
+/** Whether [point] lies within [toleranceRadius] of any segment of [stroke], for tap-to-erase hit-testing. */
+internal fun isPointNearStroke(point: NormalizedPoint, stroke: ConfidentialMarkStroke, toleranceRadius: Float): Boolean {
+    if (stroke.points.size == 1) return distance(point, stroke.points[0]) <= toleranceRadius
+    return stroke.points.zipWithNext().any { (a, b) -> distanceToSegment(point, a, b) <= toleranceRadius }
+}
+
+private fun distance(a: NormalizedPoint, b: NormalizedPoint): Float {
+    val dx = a.x - b.x
+    val dy = a.y - b.y
+    return sqrt(dx * dx + dy * dy)
+}
+
+private fun distanceToSegment(p: NormalizedPoint, a: NormalizedPoint, b: NormalizedPoint): Float {
+    val abx = b.x - a.x
+    val aby = b.y - a.y
+    val lengthSquared = abx * abx + aby * aby
+    if (lengthSquared == 0f) return distance(p, a)
+    val t = (((p.x - a.x) * abx) + ((p.y - a.y) * aby)) / lengthSquared
+    val clampedT = t.coerceIn(0f, 1f)
+    val closest = NormalizedPoint(a.x + clampedT * abx, a.y + clampedT * aby)
+    return distance(p, closest)
 }
