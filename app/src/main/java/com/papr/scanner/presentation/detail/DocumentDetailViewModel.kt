@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.papr.scanner.core.FileUtils
 import com.papr.scanner.data.repository.DocumentRepository
+import com.papr.scanner.domain.model.ConfidentialMarkStroke
 import com.papr.scanner.domain.model.Document
 import com.papr.scanner.domain.model.Page
 import com.papr.scanner.pdf.PasswordProtection
@@ -39,6 +40,7 @@ class DocumentDetailViewModel(
     private val isExporting = MutableStateFlow(false)
     private val isDeleted = MutableStateFlow(false)
     private val refreshTrigger = MutableStateFlow(0)
+    private val isMarkingConfidential = MutableStateFlow(false)
 
     // Serializes every operation that reads or writes a page's image file
     // (rotate/move/delete/export all touch the same on-disk JPEGs), so two
@@ -63,7 +65,11 @@ class DocumentDetailViewModel(
         FlowsSnapshot(document, rawPages.sortedBy { it.pageIndex }, pageIndex, signature, exporting)
     }
 
-    val uiState: StateFlow<DocumentDetailUiState> = combine(flowsSnapshot, refreshTrigger) { snapshot, revision ->
+    val uiState: StateFlow<DocumentDetailUiState> = combine(
+        flowsSnapshot,
+        refreshTrigger,
+        isMarkingConfidential,
+    ) { snapshot, revision, marking ->
         DocumentDetailUiState(
             document = snapshot.document,
             pages = snapshot.pages,
@@ -72,6 +78,7 @@ class DocumentDetailViewModel(
             isExporting = snapshot.isExporting,
             isDeleted = isDeleted.value,
             revision = revision,
+            isMarkingConfidential = marking,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DocumentDetailUiState())
 
@@ -103,7 +110,7 @@ class DocumentDetailViewModel(
                     // history: reading it right after a DB write is a real race, not
                     // a hypothetical one).
                     if (page.pageIndex == 0) {
-                        FileUtils.generateThumbnail(appContext, documentId, File(page.imageUri))
+                        FileUtils.generateThumbnail(appContext, documentId, File(page.imageUri), page.confidentialMarks)
                     }
                     touchDocument()
                 }
@@ -128,12 +135,14 @@ class DocumentDetailViewModel(
                     documentRepository.updatePage(other.copy(pageIndex = page.pageIndex))
                     // Whichever of the two swapped pages now sits at index 0 (computed
                     // from the swap we just made, not re-read from reactive state).
-                    val newFirstPageFile = when (0) {
-                        other.pageIndex -> page.imageUri
-                        page.pageIndex -> other.imageUri
+                    val newFirstPage = when (0) {
+                        other.pageIndex -> page
+                        page.pageIndex -> other
                         else -> null
                     }
-                    newFirstPageFile?.let { FileUtils.generateThumbnail(appContext, documentId, File(it)) }
+                    newFirstPage?.let {
+                        FileUtils.generateThumbnail(appContext, documentId, File(it.imageUri), it.confidentialMarks)
+                    }
                     touchDocument()
                 }
             }.onFailure { e ->
@@ -168,7 +177,12 @@ class DocumentDetailViewModel(
                             document.copy(pageCount = remaining.size, updatedAt = System.currentTimeMillis())
                         )
                     }
-                    FileUtils.generateThumbnail(appContext, documentId, File(remaining.first().imageUri))
+                    FileUtils.generateThumbnail(
+                        appContext,
+                        documentId,
+                        File(remaining.first().imageUri),
+                        remaining.first().confidentialMarks,
+                    )
                 }
             }.onFailure { e ->
                 _errors.emit(e.message ?: "Failed to delete page")
@@ -205,6 +219,44 @@ class DocumentDetailViewModel(
         pendingSignature.value = null
     }
 
+    fun toggleMarkingConfidential() {
+        isMarkingConfidential.value = !isMarkingConfidential.value
+    }
+
+    fun addConfidentialMarkStroke(page: Page, stroke: ConfidentialMarkStroke) {
+        viewModelScope.launch {
+            runCatching {
+                fileMutex.withLock {
+                    val updated = page.copy(confidentialMarks = page.confidentialMarks + stroke)
+                    documentRepository.updatePage(updated)
+                    if (page.pageIndex == 0) {
+                        FileUtils.generateThumbnail(appContext, documentId, File(page.imageUri), updated.confidentialMarks)
+                    }
+                    touchDocument()
+                }
+            }.onFailure { e ->
+                _errors.emit(e.message ?: "Failed to add confidential mark")
+            }
+        }
+    }
+
+    fun eraseConfidentialMarkStroke(page: Page, stroke: ConfidentialMarkStroke) {
+        viewModelScope.launch {
+            runCatching {
+                fileMutex.withLock {
+                    val updated = page.copy(confidentialMarks = page.confidentialMarks - stroke)
+                    documentRepository.updatePage(updated)
+                    if (page.pageIndex == 0) {
+                        FileUtils.generateThumbnail(appContext, documentId, File(page.imageUri), updated.confidentialMarks)
+                    }
+                    touchDocument()
+                }
+            }.onFailure { e ->
+                _errors.emit(e.message ?: "Failed to erase confidential mark")
+            }
+        }
+    }
+
     fun export(settings: ExportSettings) {
         val state = uiState.value
         val document = state.document ?: return
@@ -222,12 +274,17 @@ class DocumentDetailViewModel(
                         ?.takeIf { settings.signatureEnabled }
                         ?.let { pending -> SignaturePlacement(pending.bitmap, pending.pageIndex) }
 
+                    val confidentialMarksByPageIndex = state.pages
+                        .filter { it.confidentialMarks.isNotEmpty() }
+                        .associate { it.pageIndex to it.confidentialMarks }
+
                     pdfEngine.generatePdf(
                         pageFiles,
                         exportFile,
                         PdfGenerationOptions(
                             ocrEnabled = settings.ocrEnabled,
                             signature = signature,
+                            confidentialMarksByPageIndex = confidentialMarksByPageIndex,
                             passwordProtection = settings.password
                                 .takeIf { settings.passwordEnabled && it.isNotBlank() }
                                 ?.let { PasswordProtection(userPassword = it) },

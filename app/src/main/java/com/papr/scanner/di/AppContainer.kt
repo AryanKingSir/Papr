@@ -13,6 +13,7 @@ import com.papr.scanner.data.repository.DocumentMerger
 import com.papr.scanner.data.repository.DocumentRepository
 import com.papr.scanner.data.repository.DocumentRepositoryImpl
 import com.papr.scanner.pdf.BitmapPdfCompiler
+import com.papr.scanner.pdf.ConfidentialMarkRenderer
 import com.papr.scanner.pdf.InvisibleTextLayerInjector
 import com.papr.scanner.pdf.OcrTextStamper
 import com.papr.scanner.pdf.PageTextExtractor
@@ -54,6 +55,7 @@ class AppContainer(private val context: Context) {
             BitmapPdfCompiler(),
             OcrTextStamper(),
             SignatureStamper(),
+            ConfidentialMarkRenderer(),
             InvisibleTextLayerInjector(),
             PdfEncryptor(),
         )

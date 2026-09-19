@@ -3,9 +3,12 @@ package com.papr.scanner.core
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.graphics.Matrix
 import android.net.Uri
 import androidx.core.content.FileProvider
+import com.papr.scanner.domain.model.ConfidentialMarkStroke
+import com.papr.scanner.pdf.ConfidentialMarkRenderer
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
@@ -72,8 +75,19 @@ object FileUtils {
         if (rotated !== original) original.recycle()
     }
 
-    /** Generates a small JPEG thumbnail from a page image, overwriting any previous one for this document. */
-    suspend fun generateThumbnail(context: Context, documentId: Long, sourcePageFile: File): File =
+    /**
+     * Generates a small JPEG thumbnail from a page image, overwriting any
+     * previous one for this document. [confidentialMarks] (if any) are baked
+     * into this cached thumbnail so a marked page never shows unredacted in
+     * the home grid preview - the live full-size page file itself is never
+     * touched, only this derived cache artifact.
+     */
+    suspend fun generateThumbnail(
+        context: Context,
+        documentId: Long,
+        sourcePageFile: File,
+        confidentialMarks: List<ConfidentialMarkStroke> = emptyList(),
+    ): File =
         withContext(Dispatchers.IO) {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(sourcePageFile.absolutePath, bounds)
@@ -82,6 +96,9 @@ object FileUtils {
                 sourcePageFile.absolutePath,
                 BitmapFactory.Options().apply { inSampleSize = sampleSize },
             ) ?: throw IOException("Failed to decode bitmap: ${sourcePageFile.absolutePath}")
+            if (confidentialMarks.isNotEmpty()) {
+                ConfidentialMarkRenderer().draw(Canvas(bitmap), confidentialMarks, bitmap.width, bitmap.height)
+            }
             val destination = thumbnailFile(context, documentId)
             destination.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it) }
             bitmap.recycle()

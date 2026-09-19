@@ -1,6 +1,7 @@
 package com.papr.scanner.pdf
 
 import android.graphics.Bitmap
+import com.papr.scanner.domain.model.ConfidentialMarkStroke
 import com.papr.scanner.pdf.security.PdfEncryptor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -14,6 +15,7 @@ data class PasswordProtection(val userPassword: String, val ownerPassword: Strin
 data class PdfGenerationOptions(
     val ocrEnabled: Boolean = false,
     val signature: SignaturePlacement? = null,
+    val confidentialMarksByPageIndex: Map<Int, List<ConfidentialMarkStroke>> = emptyMap(),
     val passwordProtection: PasswordProtection? = null,
     val targetSizeBytes: Long? = null,
 )
@@ -22,6 +24,7 @@ class PdfEngine(
     private val bitmapPdfCompiler: BitmapPdfCompiler,
     private val ocrTextStamper: OcrTextStamper,
     private val signatureStamper: SignatureStamper,
+    private val confidentialMarkRenderer: ConfidentialMarkRenderer,
     private val invisibleTextLayerInjector: InvisibleTextLayerInjector,
     private val pdfEncryptor: PdfEncryptor,
 ) {
@@ -58,6 +61,9 @@ class PdfEngine(
                 if (placement.pageIndex == pageIndex) {
                     signatureStamper.stamp(canvas, placement.bitmap, bitmap.width, bitmap.height)
                 }
+            }
+            options.confidentialMarksByPageIndex[pageIndex]?.let { marks ->
+                confidentialMarkRenderer.draw(canvas, marks, bitmap.width, bitmap.height)
             }
         }
 

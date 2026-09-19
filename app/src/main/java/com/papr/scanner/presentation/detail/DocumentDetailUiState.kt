@@ -19,6 +19,7 @@ data class DocumentDetailUiState(
     // without this the UI would silently miss the update until something
     // else happens to also change a real field.
     val revision: Int = 0,
+    val isMarkingConfidential: Boolean = false,
 )
 
 data class ExportSettings(
