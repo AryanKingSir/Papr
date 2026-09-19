@@ -15,7 +15,6 @@ mlkitTextRecognition = "19.0.1"
 coroutines = "1.11.0"
 coilCompose = "3.6.2"
 junit = "4.13.2"
-robolectric = "4.14.1"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -49,7 +48,6 @@ kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-t
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coilCompose" }
 
 junit = { module = "junit:junit", version.ref = "junit" }
-robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
