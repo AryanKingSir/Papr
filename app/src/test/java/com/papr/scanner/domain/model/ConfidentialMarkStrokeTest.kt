@@ -54,4 +54,22 @@ class ConfidentialMarkStrokeTest {
     fun `decodes a blank string as an empty list`() {
         assertEquals(emptyList<ConfidentialMarkStroke>(), decodeMarkStrokes(""))
     }
+
+    @Test
+    fun `rotating a stroke clockwise maps x,y to 1-y,x`() {
+        val stroke = ConfidentialMarkStroke(listOf(NormalizedPoint(0.25f, 0.5f), NormalizedPoint(0.75f, 0.125f)))
+
+        val result = stroke.rotatedClockwise()
+
+        assertEquals(listOf(NormalizedPoint(0.5f, 0.25f), NormalizedPoint(0.875f, 0.75f)), result.points)
+    }
+
+    @Test
+    fun `four clockwise rotations restore the stroke`() {
+        val stroke = ConfidentialMarkStroke(listOf(NormalizedPoint(0.25f, 0.5f), NormalizedPoint(0.75f, 0.125f)))
+
+        val result = stroke.rotatedClockwise().rotatedClockwise().rotatedClockwise().rotatedClockwise()
+
+        assertEquals(stroke, result)
+    }
 }

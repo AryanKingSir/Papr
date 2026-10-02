@@ -20,3 +20,7 @@ internal fun decodeMarkStrokes(raw: String?): List<ConfidentialMarkStroke> {
         ConfidentialMarkStroke(points)
     }
 }
+
+/** Follows a 90° clockwise rotation of the page image, so the mark keeps covering the same content. */
+fun ConfidentialMarkStroke.rotatedClockwise(): ConfidentialMarkStroke =
+    ConfidentialMarkStroke(points.map { NormalizedPoint(x = 1f - it.y, y = it.x) })
