@@ -10,5 +10,6 @@ class PaprApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        container.pageTextExtractor.extractMissingInBackground()
     }
 }

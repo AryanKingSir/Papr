@@ -11,6 +11,13 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Papr">
 
+        <!-- The text-recognition model is unbundled (downloaded through Play services).
+             This asks Play to fetch it at install time, rather than on first use -
+             otherwise OCR fails until the background download happens to finish. -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="ocr" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

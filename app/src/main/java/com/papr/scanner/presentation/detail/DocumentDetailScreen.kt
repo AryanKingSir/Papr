@@ -184,8 +184,8 @@ fun DocumentDetailScreen(
 
             when {
                 uiState.isMarkingConfidential -> HintRow(
-                    text = "Drag to cover content, tap a mark to remove it. Hidden text may still be found by " +
-                        "search or by copying text from an exported PDF.",
+                    text = "Drag to cover content, tap a mark to remove it. Covered text can still be found " +
+                        "by searching in Papr.",
                     onDone = viewModel::toggleMarkingConfidential,
                 )
                 uiState.isPlacingSignature -> HintRow(

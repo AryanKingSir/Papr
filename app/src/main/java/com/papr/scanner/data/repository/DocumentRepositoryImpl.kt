@@ -39,6 +39,9 @@ class DocumentRepositoryImpl(
     override suspend fun getPages(documentId: Long): List<Page> =
         pageDao.getForDocumentOnce(documentId).map { it.toDomain() }
 
+    override suspend fun getPagesMissingText(): List<Page> =
+        pageDao.getPagesMissingText().map { it.toDomain() }
+
     override suspend fun insertDocument(document: Document): Long =
         documentDao.insert(document.toEntity())
 

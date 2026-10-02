@@ -49,4 +49,22 @@ class PageLayoutTest {
         assertEquals((1000f - (50f + 10f * 2f)) * POINTS_PER_PIXEL, placement.toPdfY(10f), 0.001f)
         assertEquals(10f * 2f * POINTS_PER_PIXEL, placement.toPdfLength(10f), 0.001f)
     }
+
+    @Test
+    fun `scaling keeps a page's shape`() {
+        assertEquals(600 to 825, scaledSize(1200, 1650, scale = 0.5f, minDimension = 300))
+    }
+
+    @Test
+    fun `the minimum-size floor scales both sides together instead of squashing the page`() {
+        val (width, height) = scaledSize(1200, 1650, scale = 0.1f, minDimension = 300)
+
+        assertEquals(300, width)
+        assertEquals(413, height)
+    }
+
+    @Test
+    fun `never scales a page up`() {
+        assertEquals(200 to 250, scaledSize(200, 250, scale = 0.5f, minDimension = 300))
+    }
 }

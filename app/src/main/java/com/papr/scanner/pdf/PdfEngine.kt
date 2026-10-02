@@ -34,12 +34,30 @@ class PdfEngine(
     ): File = withContext(Dispatchers.IO) {
         val ocrElementsByPage = mutableMapOf<Int, List<OcrTextElement>>()
 
-        bitmapPdfCompiler.compile(pageFiles, outputFile, options.targetSizeBytes) { canvas, bitmap, pageIndex, placement ->
+        bitmapPdfCompiler.compile(
+            pageFiles,
+            outputFile,
+            options.targetSizeBytes,
+            preparePage = { canvas, bitmap, pageIndex ->
+                // Drawn into the page image's own pixels rather than layered on top
+                // as separate PDF objects: a mark can't be lifted off in a PDF editor
+                // to reveal what's beneath, overlays shrink with a compression target,
+                // and the mark's label font never has to be embedded in the file.
+                // Signature first, so a confidential mark always stays on top.
+                options.signaturesByPageIndex[pageIndex]?.let { signature ->
+                    signatureStamper.draw(canvas, signature, bitmap.width, bitmap.height)
+                }
+                options.confidentialMarksByPageIndex[pageIndex]?.let { marks ->
+                    confidentialMarkRenderer.draw(canvas, marks, bitmap.width, bitmap.height)
+                }
+            },
+        ) { bitmap, pageIndex, placement ->
             if (options.ocrEnabled) {
-                // Injected as raw PDF operators, bypassing Canvas entirely - so unlike
-                // the overlays below, this doesn't get the page's fit transform for
-                // free; placement applies it by hand (and flips Y, since PDF space
-                // is bottom-up while OcrTextStamper's boxes are top-down).
+                // Runs on the already-marked image, so text hidden by a confidential
+                // mark is never recognized into the selectable text layer.
+                // Injected as raw PDF operators, bypassing Canvas entirely - so
+                // placement applies the page's fit transform by hand (and flips Y,
+                // since PDF space is bottom-up while OcrTextStamper's boxes are top-down).
                 ocrElementsByPage[pageIndex] = ocrTextStamper.recognize(bitmap).map { element ->
                     element.copy(
                         x = placement.toPdfX(element.x),
@@ -48,13 +66,6 @@ class PdfEngine(
                         width = placement.toPdfLength(element.width),
                     )
                 }
-            }
-            // Signature before marks, so a redaction always stays on top.
-            options.signaturesByPageIndex[pageIndex]?.let { signature ->
-                signatureStamper.draw(canvas, signature, bitmap.width, bitmap.height)
-            }
-            options.confidentialMarksByPageIndex[pageIndex]?.let { marks ->
-                confidentialMarkRenderer.draw(canvas, marks, bitmap.width, bitmap.height)
             }
         }
 

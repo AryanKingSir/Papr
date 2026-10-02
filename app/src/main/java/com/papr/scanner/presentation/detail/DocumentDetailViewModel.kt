@@ -16,6 +16,7 @@ import com.papr.scanner.domain.model.rotatedClockwise
 import com.papr.scanner.pdf.PasswordProtection
 import com.papr.scanner.pdf.PdfEngine
 import com.papr.scanner.pdf.PdfGenerationOptions
+import com.papr.scanner.pdf.TextRecognitionUnavailableException
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
@@ -295,6 +296,12 @@ class DocumentDetailViewModel(
                 _pdfReady.emit(outputFile)
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: TextRecognitionUnavailableException) {
+                Log.w("Papr", "Export with OCR attempted before text recognition was ready", e)
+                _errors.emit(
+                    "Searchable text isn't ready yet - its language data is still downloading. " +
+                        "Try again in a minute, or export without searchable text."
+                )
             } catch (e: Exception) {
                 Log.e("Papr", "Export failed", e)
                 _errors.emit("Export failed. Please try again.")

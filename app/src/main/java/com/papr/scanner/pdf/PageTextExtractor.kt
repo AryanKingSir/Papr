@@ -19,8 +19,28 @@ class PageTextExtractor(
 ) {
     /** Fires OCR for [pages] in the background, without holding up the scan/save flow that called it. */
     fun extractInBackground(pages: List<Page>) {
-        scope.launch {
-            pages.forEach { page -> extractAndSave(page) }
+        scope.launch { extractAll(pages) }
+    }
+
+    /**
+     * Catches up on pages whose OCR never succeeded - e.g. scanned while the
+     * text-recognition model was still downloading right after install, which
+     * is exactly when a new user scans their first document.
+     */
+    fun extractMissingInBackground() {
+        scope.launch { extractAll(documentRepository.getPagesMissingText()) }
+    }
+
+    private suspend fun extractAll(pages: List<Page>) {
+        for (page in pages) {
+            try {
+                extractAndSave(page)
+            } catch (e: TextRecognitionUnavailableException) {
+                // Every remaining page would fail the same way; their text stays null,
+                // so extractMissingInBackground picks them up on a later launch.
+                Log.w("Papr", "Text recognition not ready yet; leaving ${pages.size} page(s) for later", e)
+                return
+            }
         }
     }
 
@@ -35,8 +55,11 @@ class PageTextExtractor(
             } finally {
                 bitmap.recycle()
             }
-            documentRepository.updateExtractedText(page.id, page.imageUri, text.ifBlank { null })
+            // "" (not null) when nothing was found, so it isn't retried as "never indexed".
+            documentRepository.updateExtractedText(page.id, page.imageUri, text.trim())
         } catch (e: CancellationException) {
+            throw e
+        } catch (e: TextRecognitionUnavailableException) {
             throw e
         } catch (e: Exception) {
             // Search just won't find this page's content; everything else is unaffected.

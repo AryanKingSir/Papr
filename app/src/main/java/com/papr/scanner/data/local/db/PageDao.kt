@@ -22,6 +22,10 @@ interface PageDao {
     @Query("SELECT * FROM pages WHERE documentId = :documentId ORDER BY pageIndex ASC")
     suspend fun getForDocumentOnce(documentId: Long): List<PageEntity>
 
+    /** Pages OCR hasn't successfully run on yet (null text; a page with no text found stores ""). */
+    @Query("SELECT * FROM pages WHERE extractedText IS NULL")
+    suspend fun getPagesMissingText(): List<PageEntity>
+
     // Touches only the text column, and only while the page still shows the
     // image that was recognized - so a slow OCR pass can never overwrite edits
     // made in the meantime, or label a replaced page with its old image's text.

@@ -1,5 +1,7 @@
 package com.papr.scanner.pdf
 
+import kotlin.math.roundToInt
+
 /**
  * A scanned page's pixel dimensions can't be used directly as PDF point
  * dimensions - PdfDocument.PageInfo is in points (1/72 inch), so a ~2000px-wide
@@ -45,4 +47,16 @@ internal fun fitPlacement(pageWidthPx: Int, pageHeightPx: Int, imageWidth: Int, 
         offsetY = (pageHeightPx - imageHeight * scale) / 2f,
         scale = scale,
     )
+}
+
+/**
+ * A page's pixel size after applying [scale] (used to hit a compression
+ * target), never shrinking its shorter side below [minDimension] and never
+ * enlarging it. Both sides scale by the same factor, so a floor can't squash
+ * the page out of shape.
+ */
+internal fun scaledSize(width: Int, height: Int, scale: Float, minDimension: Int): Pair<Int, Int> {
+    val floor = minDimension / minOf(width, height).toFloat()
+    val factor = maxOf(scale, floor).coerceAtMost(1f)
+    return (width * factor).roundToInt() to (height * factor).roundToInt()
 }

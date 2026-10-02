@@ -1,6 +1,7 @@
 package com.papr.scanner.pdf
 
 import android.graphics.Bitmap
+import com.google.mlkit.common.MlKitException
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
@@ -8,6 +9,9 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
+
+/** On-device text recognition can't run yet - typically its model is still being downloaded by Play services. */
+class TextRecognitionUnavailableException(cause: Throwable) : Exception(cause.message, cause)
 
 data class OcrTextElement(val text: String, val x: Float, val y: Float, val fontSize: Float, val width: Float)
 
@@ -40,6 +44,9 @@ class OcrTextStamper {
         suspendCancellableCoroutine { continuation ->
             recognizer.process(InputImage.fromBitmap(bitmap, 0))
                 .addOnSuccessListener { text -> continuation.resume(text) }
-                .addOnFailureListener { error -> continuation.resumeWithException(error) }
+                .addOnFailureListener { error ->
+                    val unavailable = error is MlKitException && error.errorCode == MlKitException.UNAVAILABLE
+                    continuation.resumeWithException(if (unavailable) TextRecognitionUnavailableException(error) else error)
+                }
         }
 }

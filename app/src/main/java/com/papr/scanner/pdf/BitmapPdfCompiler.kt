@@ -20,12 +20,14 @@ class BitmapPdfCompiler {
         pageFiles: List<File>,
         outputFile: File,
         targetSizeBytes: Long? = null,
-        // Called with the page canvas already transformed so that drawing in the
-        // page bitmap's own pixel space lines up with the drawn image. Content
-        // that bypasses Canvas (e.g. raw PDF text operators) uses placement to
-        // apply the same transform by hand.
-        onPageDrawn: suspend (canvas: Canvas, bitmap: Bitmap, pageIndex: Int, placement: PagePlacement) -> Unit =
-            { _, _, _, _ -> },
+        // Draws onto a page's (mutable) bitmap before it's embedded, in the
+        // bitmap's own pixel space - anything drawn here becomes part of the
+        // page image itself, and shrinks along with it for a compression target.
+        preparePage: (canvas: Canvas, bitmap: Bitmap, pageIndex: Int) -> Unit = { _, _, _ -> },
+        // Called after the prepared image is drawn on the PDF page. Content that
+        // isn't part of the image (e.g. raw PDF text operators) uses placement to
+        // position itself relative to the image.
+        onPageDrawn: suspend (bitmap: Bitmap, pageIndex: Int, placement: PagePlacement) -> Unit = { _, _, _ -> },
     ): File = withContext(Dispatchers.IO) {
         // PdfDocument gives no direct control over embedded image size or
         // quality - the only lever that actually changes the written file's
@@ -37,7 +39,7 @@ class BitmapPdfCompiler {
         // PdfDocument actually writes.
         var scale = 1f
         for (attempt in 0 until MAX_ATTEMPTS) {
-            writePdf(pageFiles, outputFile, scale, onPageDrawn)
+            writePdf(pageFiles, outputFile, scale, preparePage, onPageDrawn)
             // Written as two direct checks (not one `val` combining them) so the
             // compiler can still smart-cast targetSizeBytes to non-null below -
             // smart-casting doesn't see through an intermediate Boolean val.
@@ -52,32 +54,42 @@ class BitmapPdfCompiler {
         pageFiles: List<File>,
         outputFile: File,
         scale: Float,
-        onPageDrawn: suspend (canvas: Canvas, bitmap: Bitmap, pageIndex: Int, placement: PagePlacement) -> Unit,
+        preparePage: (canvas: Canvas, bitmap: Bitmap, pageIndex: Int) -> Unit,
+        onPageDrawn: suspend (bitmap: Bitmap, pageIndex: Int, placement: PagePlacement) -> Unit,
     ) {
         val document = PdfDocument()
         try {
-            // All pages share one physical page size (the largest decoded
-            // page, post-downsample-cap, post-target-scale), and every page's
-            // image is fit-scaled into it - so a multi-page scan of e.g. a book
-            // gets same-size pages with same-size content, even though each
-            // scan's pixel dimensions differ with how far away the camera was.
-            val (pageWidthPx, pageHeightPx) = uniformPageSizePx(pageFiles, scale)
+            // All pages share one physical page size - the largest decoded page -
+            // and every page's image is fit-scaled into it, so a multi-page scan
+            // of e.g. a book gets same-size pages with same-size content, even
+            // though each scan's pixel dimensions differ with how far away the
+            // camera was. The box is measured at full resolution, so compressing
+            // lowers image resolution without shrinking the paper itself.
+            val (pageWidthPx, pageHeightPx) = uniformPageSizePx(pageFiles)
             val pageWidthPt = (pageWidthPx * POINTS_PER_PIXEL).roundToInt()
             val pageHeightPt = (pageHeightPx * POINTS_PER_PIXEL).roundToInt()
             pageFiles.forEachIndexed { index, pageFile ->
                 val bitmap = decodeScaled(pageFile, scale)
-                // Computed from the bitmap actually decoded, not predicted
-                // dimensions, so a page can never overflow the box and be cropped.
-                val placement = fitPlacement(pageWidthPx, pageHeightPx, bitmap.width, bitmap.height)
-                val pageInfo = PdfDocument.PageInfo.Builder(pageWidthPt, pageHeightPt, index + 1).create()
-                val page = document.startPage(pageInfo)
-                page.canvas.scale(POINTS_PER_PIXEL, POINTS_PER_PIXEL)
-                page.canvas.translate(placement.offsetX, placement.offsetY)
-                page.canvas.scale(placement.scale, placement.scale)
-                page.canvas.drawBitmap(bitmap, 0f, 0f, BITMAP_PAINT)
-                onPageDrawn(page.canvas, bitmap, index, placement)
-                document.finishPage(page)
-                bitmap.recycle()
+                try {
+                    preparePage(Canvas(bitmap), bitmap, index)
+                    // Computed from the bitmap actually decoded, not predicted
+                    // dimensions, so a page can never overflow the box and be cropped.
+                    val placement = fitPlacement(pageWidthPx, pageHeightPx, bitmap.width, bitmap.height)
+                    val page = document.startPage(PdfDocument.PageInfo.Builder(pageWidthPt, pageHeightPt, index + 1).create())
+                    try {
+                        page.canvas.scale(POINTS_PER_PIXEL, POINTS_PER_PIXEL)
+                        page.canvas.translate(placement.offsetX, placement.offsetY)
+                        page.canvas.scale(placement.scale, placement.scale)
+                        page.canvas.drawBitmap(bitmap, 0f, 0f, BITMAP_PAINT)
+                    } finally {
+                        // Always finish the page: close() below throws "Current page
+                        // not finished" otherwise, replacing the real error with that one.
+                        document.finishPage(page)
+                    }
+                    onPageDrawn(bitmap, index, placement)
+                } finally {
+                    bitmap.recycle()
+                }
             }
             outputFile.outputStream().use { document.writeTo(it) }
         } finally {
@@ -85,8 +97,8 @@ class BitmapPdfCompiler {
         }
     }
 
-    /** The largest post-downsample-cap, post-[scale] page dimensions across the document, used as the uniform PDF page size. */
-    private fun uniformPageSizePx(pageFiles: List<File>, scale: Float): Pair<Int, Int> {
+    /** The largest post-downsample-cap page dimensions across the document, used as the uniform PDF page size. */
+    private fun uniformPageSizePx(pageFiles: List<File>): Pair<Int, Int> {
         var maxWidth = 1
         var maxHeight = 1
         for (pageFile in pageFiles) {
@@ -95,36 +107,34 @@ class BitmapPdfCompiler {
             maxWidth = maxOf(maxWidth, bounds.outWidth / sampleSize)
             maxHeight = maxOf(maxHeight, bounds.outHeight / sampleSize)
         }
-        return scaledDimension(maxWidth, scale) to scaledDimension(maxHeight, scale)
+        return maxWidth to maxHeight
     }
 
-    /** Caps decoded page resolution so a multi-page export of very high-res scans can't exhaust the heap, then applies [scale] on top (used to hit a compression target). */
+    /**
+     * Decodes a page as a mutable bitmap (so preparePage can draw on it), capped
+     * so a multi-page export of very high-res scans can't exhaust the heap, then
+     * shrunk by [scale] (used to hit a compression target).
+     */
     private fun decodeScaled(pageFile: File, scale: Float): Bitmap {
-        val downsampled = decodeDownsampled(pageFile)
-        if (scale >= 1f) return downsampled
-        val scaled = downsampled.scale(
-            scaledDimension(downsampled.width, scale),
-            scaledDimension(downsampled.height, scale),
-        )
-        if (scaled !== downsampled) downsampled.recycle()
-        return scaled
-    }
-
-    private fun decodeDownsampled(pageFile: File): Bitmap {
         val bounds = decodeBounds(pageFile)
         val sampleSize = sampleSizeFor(maxOf(bounds.outWidth, bounds.outHeight), MAX_PAGE_DIMENSION)
-        return BitmapFactory.decodeFile(
+        val decoded = BitmapFactory.decodeFile(
             pageFile.absolutePath,
-            BitmapFactory.Options().apply { inSampleSize = sampleSize },
+            BitmapFactory.Options().apply {
+                inSampleSize = sampleSize
+                inMutable = true
+            },
         ) ?: throw IOException("Failed to decode bitmap: ${pageFile.absolutePath}")
+        val (width, height) = scaledSize(decoded.width, decoded.height, scale, MIN_DIMENSION)
+        if (width == decoded.width && height == decoded.height) return decoded
+        val scaled = decoded.scale(width, height)
+        decoded.recycle()
+        return if (scaled.isMutable) scaled else scaled.copy(Bitmap.Config.ARGB_8888, true).also { scaled.recycle() }
     }
 
     private fun decodeBounds(pageFile: File): BitmapFactory.Options =
         BitmapFactory.Options().apply { inJustDecodeBounds = true }
             .also { BitmapFactory.decodeFile(pageFile.absolutePath, it) }
-
-    private fun scaledDimension(dimension: Int, scale: Float): Int =
-        (dimension * scale).roundToInt().coerceAtLeast(MIN_DIMENSION)
 
     private companion object {
         /** Longest-side cap on decoded page bitmaps, to bound peak memory during multi-page export. */
@@ -133,7 +143,7 @@ class BitmapPdfCompiler {
         /** How many times [compile] will rebuild the whole document while searching for a target size. */
         const val MAX_ATTEMPTS = 6
 
-        /** Floor on any page dimension, so an unreasonably small target can't shrink a page to nothing. */
+        /** Floor on a page's shorter side, so an unreasonably small target can't shrink a page to nothing. */
         const val MIN_DIMENSION = 300
 
         /** Smooths the image when it's scaled to fit the page box. */

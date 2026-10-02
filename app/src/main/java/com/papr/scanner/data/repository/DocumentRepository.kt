@@ -15,6 +15,7 @@ interface DocumentRepository {
     suspend fun getDocument(id: Long): Document?
     suspend fun getPage(id: Long): Page?
     suspend fun getPages(documentId: Long): List<Page>
+    suspend fun getPagesMissingText(): List<Page>
 
     suspend fun insertDocument(document: Document): Long
     suspend fun updateDocument(document: Document)
