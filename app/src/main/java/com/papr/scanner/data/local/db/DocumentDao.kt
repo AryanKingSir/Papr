@@ -16,6 +16,9 @@ interface DocumentDao {
     @Query("SELECT * FROM documents WHERE id = :id")
     fun getById(id: Long): Flow<DocumentEntity?>
 
+    @Query("SELECT * FROM documents WHERE id = :id")
+    suspend fun getByIdOnce(id: Long): DocumentEntity?
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(document: DocumentEntity): Long
 

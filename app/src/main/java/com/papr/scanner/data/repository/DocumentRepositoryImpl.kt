@@ -4,8 +4,10 @@ import com.papr.scanner.data.local.db.DocumentDao
 import com.papr.scanner.data.local.db.DocumentEntity
 import com.papr.scanner.data.local.db.PageDao
 import com.papr.scanner.data.local.db.PageEntity
+import com.papr.scanner.data.local.db.SignatureColumns
 import com.papr.scanner.domain.model.Document
 import com.papr.scanner.domain.model.Page
+import com.papr.scanner.domain.model.PageSignature
 import com.papr.scanner.domain.model.decodeMarkStrokes
 import com.papr.scanner.domain.model.encodeMarkStrokes
 import kotlinx.coroutines.flow.Flow
@@ -28,6 +30,15 @@ class DocumentRepositoryImpl(
     override fun getAllPages(): Flow<List<Page>> =
         pageDao.getAll().map { entities -> entities.map { it.toDomain() } }
 
+    override suspend fun getDocument(id: Long): Document? =
+        documentDao.getByIdOnce(id)?.toDomain()
+
+    override suspend fun getPage(id: Long): Page? =
+        pageDao.getById(id)?.toDomain()
+
+    override suspend fun getPages(documentId: Long): List<Page> =
+        pageDao.getForDocumentOnce(documentId).map { it.toDomain() }
+
     override suspend fun insertDocument(document: Document): Long =
         documentDao.insert(document.toEntity())
 
@@ -48,6 +59,9 @@ class DocumentRepositoryImpl(
 
     override suspend fun deletePage(page: Page) =
         pageDao.delete(page.toEntity())
+
+    override suspend fun updateExtractedText(pageId: Long, imageUri: String, text: String?) =
+        pageDao.updateExtractedText(pageId, imageUri, text)
 }
 
 private fun DocumentEntity.toDomain() = Document(
@@ -79,6 +93,7 @@ private fun PageEntity.toDomain() = Page(
     imageUri = imageUri,
     extractedText = extractedText,
     confidentialMarks = decodeMarkStrokes(confidentialMarks),
+    signature = signature?.let { PageSignature(it.imagePath, it.x, it.y, it.width, it.aspectRatio) },
 )
 
 private fun Page.toEntity() = PageEntity(
@@ -88,4 +103,5 @@ private fun Page.toEntity() = PageEntity(
     imageUri = imageUri,
     extractedText = extractedText,
     confidentialMarks = encodeMarkStrokes(confidentialMarks).ifEmpty { null },
+    signature = signature?.let { SignatureColumns(it.imagePath, it.x, it.y, it.width, it.aspectRatio) },
 )

@@ -7,4 +7,5 @@ data class Page(
     val imageUri: String,
     val extractedText: String?,
     val confidentialMarks: List<ConfidentialMarkStroke> = emptyList(),
+    val signature: PageSignature? = null,
 )

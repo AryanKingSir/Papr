@@ -1,5 +1,6 @@
 package com.papr.scanner.data.local.db
 
+import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -25,4 +26,6 @@ data class PageEntity(
     val imageUri: String,
     val extractedText: String?,
     val confidentialMarks: String? = null,
+    @Embedded(prefix = "signature_")
+    val signature: SignatureColumns? = null,
 )
