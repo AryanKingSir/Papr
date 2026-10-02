@@ -24,7 +24,6 @@ data class DocumentDetailUiState(
 
 data class ExportSettings(
     val ocrEnabled: Boolean = false,
-    val signatureEnabled: Boolean = false,
     val compressToTargetSize: Boolean = false,
     val targetSizeMb: Float = 1f,
     val passwordEnabled: Boolean = false,

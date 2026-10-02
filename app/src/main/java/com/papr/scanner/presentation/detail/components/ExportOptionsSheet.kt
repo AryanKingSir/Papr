@@ -28,13 +28,12 @@ import com.papr.scanner.presentation.detail.ExportSettings
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExportOptionsSheet(
-    hasSignature: Boolean,
+    isExporting: Boolean,
     onExport: (ExportSettings) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState()
     var ocrEnabled by remember { mutableStateOf(false) }
-    var signatureEnabled by remember { mutableStateOf(hasSignature) }
     var compressEnabled by remember { mutableStateOf(false) }
     var targetSizeMb by remember { mutableStateOf(1f) }
     var passwordEnabled by remember { mutableStateOf(false) }
@@ -50,14 +49,6 @@ fun ExportOptionsSheet(
                 checked = ocrEnabled,
                 onCheckedChange = { ocrEnabled = it },
             )
-            if (hasSignature) {
-                OptionRow(
-                    title = "Include signature",
-                    subtitle = "Add the signature you drew to the page",
-                    checked = signatureEnabled,
-                    onCheckedChange = { signatureEnabled = it },
-                )
-            }
             OptionRow(
                 title = "Compress to target size",
                 subtitle = "Reduce image quality to hit a target file size",
@@ -97,7 +88,6 @@ fun ExportOptionsSheet(
                     onExport(
                         ExportSettings(
                             ocrEnabled = ocrEnabled,
-                            signatureEnabled = signatureEnabled,
                             compressToTargetSize = compressEnabled,
                             targetSizeMb = targetSizeMb,
                             passwordEnabled = passwordEnabled,
@@ -105,12 +95,13 @@ fun ExportOptionsSheet(
                         )
                     )
                 },
-                enabled = !passwordEnabled || password.isNotBlank(),
+                // Disabled mid-export so a second tap can't queue a duplicate export.
+                enabled = !isExporting && (!passwordEnabled || password.isNotBlank()),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 12.dp, bottom = 24.dp),
             ) {
-                Text("Export")
+                Text(if (isExporting) "Exporting…" else "Export")
             }
         }
     }

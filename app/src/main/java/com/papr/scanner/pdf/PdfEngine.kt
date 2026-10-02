@@ -1,20 +1,18 @@
 package com.papr.scanner.pdf
 
-import android.graphics.Bitmap
 import com.papr.scanner.domain.model.ConfidentialMarkStroke
+import com.papr.scanner.domain.model.PageSignature
 import com.papr.scanner.pdf.security.PdfEncryptor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
-
-data class SignaturePlacement(val bitmap: Bitmap, val pageIndex: Int)
 
 /** [ownerPassword] defaults to [userPassword] when blank, per the Standard Security Handler. */
 data class PasswordProtection(val userPassword: String, val ownerPassword: String = "")
 
 data class PdfGenerationOptions(
     val ocrEnabled: Boolean = false,
-    val signature: SignaturePlacement? = null,
+    val signaturesByPageIndex: Map<Int, PageSignature> = emptyMap(),
     val confidentialMarksByPageIndex: Map<Int, List<ConfidentialMarkStroke>> = emptyMap(),
     val passwordProtection: PasswordProtection? = null,
     val targetSizeBytes: Long? = null,
@@ -51,10 +49,9 @@ class PdfEngine(
                     )
                 }
             }
-            options.signature?.let { signature ->
-                if (signature.pageIndex == pageIndex) {
-                    signatureStamper.stamp(canvas, signature.bitmap, bitmap.width, bitmap.height)
-                }
+            // Signature before marks, so a redaction always stays on top.
+            options.signaturesByPageIndex[pageIndex]?.let { signature ->
+                signatureStamper.draw(canvas, signature, bitmap.width, bitmap.height)
             }
             options.confidentialMarksByPageIndex[pageIndex]?.let { marks ->
                 confidentialMarkRenderer.draw(canvas, marks, bitmap.width, bitmap.height)

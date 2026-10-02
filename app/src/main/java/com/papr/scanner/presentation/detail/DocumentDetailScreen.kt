@@ -218,7 +218,7 @@ fun DocumentDetailScreen(
 
     if (showExportOptions) {
         ExportOptionsSheet(
-            hasSignature = uiState.pendingSignature != null,
+            isExporting = uiState.isExporting,
             onExport = viewModel::export,
             onDismiss = { showExportOptions = false },
         )

@@ -12,7 +12,6 @@ import com.papr.scanner.domain.model.Page
 import com.papr.scanner.pdf.PasswordProtection
 import com.papr.scanner.pdf.PdfEngine
 import com.papr.scanner.pdf.PdfGenerationOptions
-import com.papr.scanner.pdf.SignaturePlacement
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -265,10 +264,6 @@ class DocumentDetailViewModel(
                     val fileName = "${FileUtils.sanitizeFileName(document.title)}.pdf"
                     val exportFile = File(FileUtils.documentDir(appContext, documentId), fileName)
 
-                    val signature = state.pendingSignature
-                        ?.takeIf { settings.signatureEnabled }
-                        ?.let { pending -> SignaturePlacement(pending.bitmap, pending.pageIndex) }
-
                     val confidentialMarksByPageIndex = state.pages
                         .filter { it.confidentialMarks.isNotEmpty() }
                         .associate { it.pageIndex to it.confidentialMarks }
@@ -278,7 +273,9 @@ class DocumentDetailViewModel(
                         exportFile,
                         PdfGenerationOptions(
                             ocrEnabled = settings.ocrEnabled,
-                            signature = signature,
+                            signaturesByPageIndex = state.pages.mapIndexedNotNull { index, page ->
+                                page.signature?.let { index to it }
+                            }.toMap(),
                             confidentialMarksByPageIndex = confidentialMarksByPageIndex,
                             passwordProtection = settings.password
                                 .takeIf { settings.passwordEnabled && it.isNotBlank() }
