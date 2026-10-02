@@ -12,6 +12,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -19,6 +20,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.papr.scanner.billing.BillingState
 import com.papr.scanner.presentation.common.paprViewModel
@@ -72,6 +74,20 @@ fun ProUpgradeSheet(onDismiss: () -> Unit) {
                 }
                 state is BillingState.Purchasing -> {
                     CircularProgressIndicator(modifier = Modifier.padding(vertical = 16.dp))
+                }
+                state is BillingState.Disconnected -> {
+                    Text(
+                        "Couldn't reach Google Play. Check your connection and try again.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(vertical = 16.dp),
+                    )
+                    OutlinedButton(
+                        onClick = viewModel::retry,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 24.dp),
+                    ) { Text("Try again") }
                 }
                 state is BillingState.Purchased -> {
                     Text(

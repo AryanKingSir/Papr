@@ -14,6 +14,10 @@ class ProUpgradeViewModel(private val billingManager: BillingManager) : ViewMode
     val isProUnlocked: StateFlow<Boolean> = billingManager.isProUnlocked
 
     init {
+        retry()
+    }
+
+    fun retry() {
         viewModelScope.launch { billingManager.connect() }
     }
 

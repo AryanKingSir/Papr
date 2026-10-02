@@ -1,10 +1,12 @@
 package com.papr.scanner.presentation.merge
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.papr.scanner.data.repository.DocumentMerger
 import com.papr.scanner.data.repository.DocumentRepository
 import com.papr.scanner.domain.model.Document
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -25,6 +27,9 @@ class MergeConfirmViewModel(
 
     private val _mergeComplete = MutableSharedFlow<Long>()
     val mergeComplete: SharedFlow<Long> = _mergeComplete.asSharedFlow()
+
+    private val _errors = MutableSharedFlow<String>()
+    val errors: SharedFlow<String> = _errors.asSharedFlow()
 
     init {
         viewModelScope.launch {
@@ -56,8 +61,16 @@ class MergeConfirmViewModel(
         if (state.documents.size < 2 || state.title.isBlank() || state.isMerging) return
         viewModelScope.launch {
             _uiState.value = state.copy(isMerging = true)
-            val newDocumentId = documentMerger.merge(state.documents.map { it.id }, state.title)
-            _mergeComplete.emit(newDocumentId)
+            try {
+                val newDocumentId = documentMerger.merge(state.documents.map { it.id }, state.title.trim())
+                _mergeComplete.emit(newDocumentId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("Papr", "Merge failed", e)
+                _uiState.value = _uiState.value.copy(isMerging = false)
+                _errors.emit("Couldn't merge these documents. Please try again.")
+            }
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.papr.scanner.presentation.merge
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,6 +30,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,9 +51,13 @@ fun MergeConfirmScreen(
         MergeConfirmViewModel(documentIds, container.documentRepository, container.documentMerger)
     }
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         viewModel.mergeComplete.collect { newDocumentId -> onMergeComplete(newDocumentId) }
+    }
+    LaunchedEffect(Unit) {
+        viewModel.errors.collect { message -> Toast.makeText(context, message, Toast.LENGTH_LONG).show() }
     }
 
     Scaffold(

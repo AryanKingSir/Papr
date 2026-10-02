@@ -135,4 +135,16 @@ class BillingManagerStateMachineTest {
         assertTrue(manager.state.value is BillingState.Ready)
         assertTrue(manager.isProUnlocked.value)
     }
+
+    @Test
+    fun `a failure while connecting settles into Disconnected instead of hanging in Connecting`() = runTest {
+        val client = FakePlayBillingClient().apply { queryProductError = IllegalStateException("Play Store unavailable") }
+        val scope = newManagerScope()
+        val manager = BillingManager(client, newUserPreferencesRepository(scope), productId, scope = scope)
+        advanceUntilIdle()
+
+        manager.connect()
+
+        assertEquals(BillingState.Disconnected, manager.state.value)
+    }
 }

@@ -3,6 +3,7 @@ package com.papr.scanner.billing
 import android.app.Activity
 import android.util.Log
 import com.papr.scanner.data.local.datastore.UserPreferencesRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -61,12 +62,20 @@ class BillingManager(
 
     suspend fun connect() {
         _state.value = BillingState.Connecting
-        if (!playBillingClient.connect()) {
+        try {
+            if (!playBillingClient.connect()) {
+                _state.value = BillingState.Disconnected
+                return
+            }
+            reconcileOwnedPurchases()
+            settleToReady()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Play services missing/outdated, offline, etc. - Disconnected lets
+            // the UI offer a retry instead of spinning in Connecting forever.
             _state.value = BillingState.Disconnected
-            return
         }
-        reconcileOwnedPurchases()
-        settleToReady()
     }
 
     fun purchase(activity: Activity) {

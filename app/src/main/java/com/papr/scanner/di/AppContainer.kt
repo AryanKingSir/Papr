@@ -62,7 +62,7 @@ class AppContainer(private val context: Context) {
     }
 
     val documentMerger: DocumentMerger by lazy {
-        DocumentMerger(documentRepository, context)
+        DocumentMerger(documentRepository, documentDeleter, context)
     }
 
     val userPreferencesRepository: UserPreferencesRepository by lazy {

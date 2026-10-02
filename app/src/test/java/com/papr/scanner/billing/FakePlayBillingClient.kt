@@ -11,6 +11,7 @@ class FakePlayBillingClient : PlayBillingClient {
     var product: BillingProduct? = null
     var ownedPurchases: List<BillingPurchase> = emptyList()
     var acknowledgeResult: Boolean = true
+    var queryProductError: Exception? = null
 
     var launchPurchaseFlowCallCount = 0
         private set
@@ -26,6 +27,7 @@ class FakePlayBillingClient : PlayBillingClient {
 
     override suspend fun queryProduct(productId: String): BillingProduct? {
         queryProductCallCount++
+        queryProductError?.let { throw it }
         return product
     }
 
