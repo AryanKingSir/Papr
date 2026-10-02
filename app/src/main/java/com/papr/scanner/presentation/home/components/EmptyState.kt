@@ -44,3 +44,25 @@ fun EmptyState(onScanClick: () -> Unit, modifier: Modifier = Modifier) {
         }
     }
 }
+
+/** Shown when there are documents, but none match the current search or filters. */
+@Composable
+fun NoMatchesState(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = "No matching documents",
+            style = MaterialTheme.typography.titleLarge,
+        )
+        Text(
+            text = "Try a different search, or clear the filters.",
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+}

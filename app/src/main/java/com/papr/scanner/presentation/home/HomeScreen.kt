@@ -1,10 +1,13 @@
 package com.papr.scanner.presentation.home
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -12,12 +15,13 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MergeType
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DocumentScanner
-import androidx.compose.material.icons.filled.MergeType
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -27,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.papr.scanner.R
@@ -44,6 +50,7 @@ import com.papr.scanner.presentation.home.components.DocumentGridItem
 import com.papr.scanner.presentation.home.components.DocumentSearchBar
 import com.papr.scanner.presentation.home.components.EmptyState
 import com.papr.scanner.presentation.home.components.FilterChipsRow
+import com.papr.scanner.presentation.home.components.NoMatchesState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,9 +60,14 @@ fun HomeScreen(
     onUpgradeClick: () -> Unit,
     onMergeClick: (documentIds: List<Long>) -> Unit,
 ) {
-    val viewModel = paprViewModel { container -> HomeViewModel(container.documentRepository, container.appContext) }
+    val viewModel = paprViewModel { container -> HomeViewModel(container.documentRepository, container.documentDeleter) }
     val uiState by viewModel.uiState.collectAsState()
     var pendingDeleteSelection by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.errors.collect { message -> Toast.makeText(context, message, Toast.LENGTH_LONG).show() }
+    }
 
     Scaffold(
         topBar = {
@@ -78,7 +90,7 @@ fun HomeScreen(
                             onClick = { onMergeClick(uiState.selectedDocumentIds) },
                             enabled = uiState.selectedDocumentIds.size >= 2,
                         ) {
-                            Icon(Icons.Default.MergeType, contentDescription = "Merge selected")
+                            Icon(Icons.AutoMirrored.Filled.MergeType, contentDescription = "Merge selected")
                         }
                     },
                 )
@@ -126,8 +138,12 @@ fun HomeScreen(
                 modifier = Modifier.padding(bottom = 8.dp),
             )
 
-            if (uiState.documents.isEmpty()) {
-                EmptyState(onScanClick = onScanClick)
+            if (uiState.isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (uiState.documents.isEmpty()) {
+                if (uiState.hasActiveFilters) NoMatchesState() else EmptyState(onScanClick = onScanClick)
             } else {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),

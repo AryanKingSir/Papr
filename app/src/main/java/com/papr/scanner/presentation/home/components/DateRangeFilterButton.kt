@@ -23,9 +23,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.papr.scanner.presentation.home.localDayRange
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,12 +47,15 @@ fun DateRangeFilterButton(
         DatePickerDialog(
             onDismissRequest = { showDialog = false },
             confirmButton = {
-                TextButton(onClick = {
-                    val start = dateRangePickerState.selectedStartDateMillis
-                    val end = dateRangePickerState.selectedEndDateMillis
-                    onDateRangeSelected(if (start != null && end != null) start..end else null)
-                    showDialog = false
-                }) { Text("OK") }
+                val start = dateRangePickerState.selectedStartDateMillis
+                TextButton(
+                    onClick = {
+                        // A start with no end is a single day.
+                        start?.let { onDateRangeSelected(localDayRange(it, dateRangePickerState.selectedEndDateMillis, TimeZone.getDefault())) }
+                        showDialog = false
+                    },
+                    enabled = start != null,
+                ) { Text("OK") }
             },
             dismissButton = {
                 TextButton(onClick = { showDialog = false }) { Text("Cancel") }

@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,6 +39,9 @@ fun DocumentGridItem(
     selectionMode: Boolean = false,
     isSelected: Boolean = false,
 ) {
+    // Remembered per composition rather than a top-level val, so it picks up the
+    // current locale instead of whichever one was active when the class loaded.
+    val dateFormat = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -104,12 +108,11 @@ fun DocumentGridItem(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 8.dp),
         )
+        // The scan date - the same date the date-range filter matches on.
         Text(
-            text = DATE_FORMAT.format(Date(document.updatedAt)),
+            text = dateFormat.format(Date(document.createdAt)),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
-
-private val DATE_FORMAT = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())

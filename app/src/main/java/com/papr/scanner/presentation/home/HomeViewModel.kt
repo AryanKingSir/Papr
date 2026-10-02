@@ -1,25 +1,28 @@
 package com.papr.scanner.presentation.home
 
-import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.papr.scanner.core.FileUtils
+import com.papr.scanner.data.repository.DocumentDeleter
 import com.papr.scanner.data.repository.DocumentRepository
 import com.papr.scanner.domain.model.Document
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class HomeViewModel(
     private val documentRepository: DocumentRepository,
-    private val appContext: Context,
+    private val documentDeleter: DocumentDeleter,
 ) : ViewModel() {
 
     private val searchQuery = MutableStateFlow("")
@@ -80,7 +83,12 @@ class HomeViewModel(
             selectedDateRange = dateRange,
             contentMatchedIds = contentMatchedIds,
         )
-    }
+        // Matching every page's OCR text is real work, redone on every keystroke
+        // and every page update (e.g. OCR finishing) - keep it off the main thread.
+    }.flowOn(Dispatchers.Default)
+
+    private val _errors = MutableSharedFlow<String>()
+    val errors: SharedFlow<String> = _errors.asSharedFlow()
 
     val uiState: StateFlow<HomeUiState> = combine(
         searchResults,
@@ -88,6 +96,7 @@ class HomeViewModel(
         selectedDocumentIds,
     ) { results, selectionMode, selectedIds ->
         HomeUiState(
+            isLoading = false,
             documents = results.documents,
             searchQuery = results.searchQuery,
             folders = results.folders,
@@ -130,21 +139,21 @@ class HomeViewModel(
 
     fun deleteSelected() {
         viewModelScope.launch {
-            // Looked up by ID directly rather than filtered from the current uiState -
-            // a document can stay "selected" while an active search/folder/date filter
-            // hides it from view, and it still needs to be deleted correctly.
-            selectedDocumentIds.value.forEach { id ->
-                documentRepository.getDocumentById(id).first()?.let { deleteDocumentFiles(it) }
+            try {
+                // Looked up by ID directly rather than filtered from the current uiState -
+                // a document can stay "selected" while an active search/folder/date filter
+                // hides it from view, and it still needs to be deleted correctly.
+                selectedDocumentIds.value.forEach { id ->
+                    documentRepository.getDocument(id)?.let { documentDeleter.delete(it) }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("Papr", "Failed to delete documents", e)
+                _errors.emit("Couldn't delete every selected document. Please try again.")
+            } finally {
+                clearSelection()
             }
-            clearSelection()
-        }
-    }
-
-    private suspend fun deleteDocumentFiles(document: Document) {
-        documentRepository.deleteDocument(document) // Room cascade-deletes the page rows
-        withContext(Dispatchers.IO) {
-            FileUtils.documentDir(appContext, document.id).deleteRecursively()
-            FileUtils.thumbnailFile(appContext, document.id).delete()
         }
     }
 }
