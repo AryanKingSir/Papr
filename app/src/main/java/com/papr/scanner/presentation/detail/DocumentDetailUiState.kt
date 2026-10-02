@@ -1,16 +1,15 @@
 package com.papr.scanner.presentation.detail
 
-import android.graphics.Bitmap
 import com.papr.scanner.domain.model.Document
 import com.papr.scanner.domain.model.Page
-
-data class PendingSignature(val bitmap: Bitmap, val pageIndex: Int)
 
 data class DocumentDetailUiState(
     val document: Document? = null,
     val pages: List<Page> = emptyList(),
     val currentPageIndex: Int = 0,
-    val pendingSignature: PendingSignature? = null,
+    // True until the document's first database read arrives - lets the screen
+    // tell "still loading" apart from "this document doesn't exist".
+    val isLoading: Boolean = true,
     val isExporting: Boolean = false,
     val isDeleted: Boolean = false,
     // Bumped on every page-file mutation (rotate, etc). Page rows can be
@@ -20,6 +19,7 @@ data class DocumentDetailUiState(
     // else happens to also change a real field.
     val revision: Int = 0,
     val isMarkingConfidential: Boolean = false,
+    val isPlacingSignature: Boolean = false,
 )
 
 data class ExportSettings(

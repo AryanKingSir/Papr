@@ -62,7 +62,13 @@ fun DocumentDetailScreen(
     onReplacePageClick: (pageId: Long) -> Unit,
 ) {
     val viewModel = paprViewModel { container ->
-        DocumentDetailViewModel(documentId, container.documentRepository, container.pdfEngine, container.appContext)
+        DocumentDetailViewModel(
+            documentId,
+            container.documentRepository,
+            container.documentDeleter,
+            container.pdfEngine,
+            container.appContext,
+        )
     }
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -143,8 +149,8 @@ fun DocumentDetailScreen(
                 currentPageIndex = uiState.currentPageIndex,
                 onPageChanged = viewModel::selectPage,
                 isMarkingConfidential = uiState.isMarkingConfidential,
-                onMarkStrokeAdded = viewModel::addConfidentialMarkStroke,
-                onMarkStrokeErased = viewModel::eraseConfidentialMarkStroke,
+                onMarkStrokeAdded = { page, stroke -> viewModel.addConfidentialMarkStroke(page.id, stroke) },
+                onMarkStrokeErased = { page, stroke -> viewModel.eraseConfidentialMarkStroke(page.id, stroke) },
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
@@ -173,10 +179,10 @@ fun DocumentDetailScreen(
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
                 IconButton(
-                    onClick = { currentPage?.let { viewModel.movePage(it, -1) } },
+                    onClick = { currentPage?.let { viewModel.movePage(it.id, -1) } },
                     enabled = currentPage != null && uiState.currentPageIndex > 0,
                 ) { Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "Move page earlier") }
-                IconButton(onClick = { currentPage?.let { viewModel.rotatePage(it) } }, enabled = currentPage != null) {
+                IconButton(onClick = { currentPage?.let { viewModel.rotatePage(it.id) } }, enabled = currentPage != null) {
                     Icon(Icons.AutoMirrored.Filled.RotateRight, contentDescription = "Rotate page")
                 }
                 IconButton(onClick = { showSignatureEditor = true }, enabled = currentPage != null) {
@@ -199,7 +205,7 @@ fun DocumentDetailScreen(
                     Icon(Icons.Filled.Delete, contentDescription = "Delete page")
                 }
                 IconButton(
-                    onClick = { currentPage?.let { viewModel.movePage(it, 1) } },
+                    onClick = { currentPage?.let { viewModel.movePage(it.id, 1) } },
                     enabled = currentPage != null && uiState.currentPageIndex < uiState.pages.size - 1,
                 ) { Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "Move page later") }
             }
@@ -209,7 +215,7 @@ fun DocumentDetailScreen(
     if (showSignatureEditor) {
         SignatureOverlayEditor(
             onSave = { bitmap ->
-                viewModel.setPendingSignature(bitmap)
+                currentPage?.let { viewModel.setSignature(it.id, bitmap) }
                 showSignatureEditor = false
             },
             onDismiss = { showSignatureEditor = false },
@@ -231,7 +237,7 @@ fun DocumentDetailScreen(
             text = { Text("This can't be undone.") },
             confirmButton = {
                 TextButton(onClick = {
-                    currentPage?.let { viewModel.deletePage(it) }
+                    currentPage?.let { viewModel.deletePage(it.id) }
                     pendingDeletePage = false
                 }) { Text("Delete") }
             },
