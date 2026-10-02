@@ -87,7 +87,10 @@ class DocumentDetailViewModel(
     val errors: SharedFlow<String> = _errors.asSharedFlow()
 
     fun selectPage(index: Int) {
-        localState.update { it.copy(currentPageIndex = index) }
+        localState.update {
+            // Signature placement belongs to one page; switching pages ends it.
+            if (index == it.currentPageIndex) it else it.copy(currentPageIndex = index, isPlacingSignature = false)
+        }
     }
 
     fun updateTitle(newTitle: String) {

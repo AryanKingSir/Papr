@@ -31,6 +31,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.core.graphics.createBitmap
 
 @Composable
 fun SignatureOverlayEditor(onSave: (Bitmap) -> Unit, onDismiss: () -> Unit) {
@@ -71,7 +72,7 @@ fun SignatureOverlayEditor(onSave: (Bitmap) -> Unit, onDismiss: () -> Unit) {
                                 color = Color.Black,
                                 start = stroke[i],
                                 end = stroke[i + 1],
-                                strokeWidth = 6f,
+                                strokeWidth = STROKE_WIDTH_PX,
                                 cap = StrokeCap.Round,
                             )
                         }
@@ -93,7 +94,7 @@ fun SignatureOverlayEditor(onSave: (Bitmap) -> Unit, onDismiss: () -> Unit) {
                     Row {
                         TextButton(onClick = onDismiss) { Text("Cancel") }
                         Button(
-                            onClick = { onSave(renderSignatureBitmap(strokes, canvasSize)) },
+                            onClick = { renderSignatureBitmap(strokes, canvasSize)?.let(onSave) },
                             enabled = strokes.isNotEmpty(),
                         ) { Text("Use signature") }
                     }
@@ -103,15 +104,17 @@ fun SignatureOverlayEditor(onSave: (Bitmap) -> Unit, onDismiss: () -> Unit) {
     }
 }
 
-private fun renderSignatureBitmap(strokes: List<List<Offset>>, size: IntSize): Bitmap {
-    val width = size.width.coerceAtLeast(1)
-    val height = size.height.coerceAtLeast(1)
-    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+/** Renders just the inked area (see [signatureCropRect]) onto a transparent bitmap; null if nothing was drawn. */
+private fun renderSignatureBitmap(strokes: List<List<Offset>>, size: IntSize): Bitmap? {
+    val crop = signatureCropRect(strokes, padding = STROKE_WIDTH_PX, canvasWidth = size.width, canvasHeight = size.height)
+        ?: return null
+    val bitmap = createBitmap(crop.width, crop.height)
     val canvas = android.graphics.Canvas(bitmap)
+    canvas.translate(-crop.left.toFloat(), -crop.top.toFloat())
     val paint = android.graphics.Paint().apply {
         color = android.graphics.Color.BLACK
         style = android.graphics.Paint.Style.STROKE
-        strokeWidth = 6f
+        strokeWidth = STROKE_WIDTH_PX
         strokeCap = android.graphics.Paint.Cap.ROUND
         isAntiAlias = true
     }
@@ -122,3 +125,5 @@ private fun renderSignatureBitmap(strokes: List<List<Offset>>, size: IntSize): B
     }
     return bitmap
 }
+
+private const val STROKE_WIDTH_PX = 6f

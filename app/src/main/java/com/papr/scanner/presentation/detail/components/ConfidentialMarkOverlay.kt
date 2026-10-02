@@ -1,13 +1,13 @@
 package com.papr.scanner.presentation.detail.components
 
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -24,39 +24,35 @@ import com.papr.scanner.pdf.ConfidentialMarkRenderer
 import com.papr.scanner.pdf.FittedBounds
 import com.papr.scanner.pdf.fittedImageBounds
 import com.papr.scanner.pdf.isPointNearStroke
-import java.io.File
 
 private val renderer = ConfidentialMarkRenderer()
 
 /**
  * Draws a page's confidential marks over its displayed image, aligned to the
  * image's actual fitted/cropped bounds within this composable's own size -
- * [crop] must match the content scale the page image itself is drawn with
- * (false for `ContentScale.Fit`, true for `ContentScale.Crop`). When
- * [editingEnabled], also turns drags into new marks and single taps on an
- * existing mark into an erase.
+ * [imageSize] is the page image's pixel size, and [crop] must match the
+ * content scale the page image itself is drawn with (false for
+ * `ContentScale.Fit`, true for `ContentScale.Crop`). When [editingEnabled],
+ * drags draw new marks and taps on an existing mark erase it; otherwise this
+ * takes no touch input at all, so whatever is beneath it stays tappable.
  */
 @Composable
 fun ConfidentialMarkOverlay(
-    imageFile: File,
+    imageSize: IntSize,
     marks: List<ConfidentialMarkStroke>,
     editingEnabled: Boolean,
-    onStrokeAdded: (ConfidentialMarkStroke) -> Unit,
-    onStrokeErased: (ConfidentialMarkStroke) -> Unit,
     modifier: Modifier = Modifier,
     crop: Boolean = false,
+    onStrokeAdded: (ConfidentialMarkStroke) -> Unit = {},
+    onStrokeErased: (ConfidentialMarkStroke) -> Unit = {},
 ) {
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
-    var imageSize by remember(imageFile) { mutableStateOf(IntSize.Zero) }
-    var currentStroke by remember(imageFile) { mutableStateOf(listOf<Offset>()) }
+    var currentStroke by remember { mutableStateOf(listOf<Offset>()) }
+    val currentMarks by rememberUpdatedState(marks)
+    val currentOnStrokeAdded by rememberUpdatedState(onStrokeAdded)
+    val currentOnStrokeErased by rememberUpdatedState(onStrokeErased)
 
-    LaunchedEffect(imageFile) {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(imageFile.absolutePath, bounds)
-        imageSize = IntSize(bounds.outWidth, bounds.outHeight)
-    }
-
-    val fitted = if (containerSize.width > 0 && containerSize.height > 0 && imageSize.width > 0 && imageSize.height > 0) {
+    val fitted = if (containerSize.width > 0 && containerSize.height > 0) {
         fittedImageBounds(
             containerWidth = containerSize.width.toFloat(),
             containerHeight = containerSize.height.toFloat(),
@@ -68,29 +64,41 @@ fun ConfidentialMarkOverlay(
         null
     }
 
+    val editing = if (editingEnabled && fitted != null) {
+        Modifier
+            // A tap never becomes a drag (drags only start past touch slop), so
+            // erasing needs its own tap detector rather than a 1-point "drag".
+            .pointerInput(fitted) {
+                detectTapGestures(onTap = { offset ->
+                    val point = fitted.normalize(offset)
+                    currentMarks
+                        .firstOrNull { isPointNearStroke(point, it, CONFIDENTIAL_MARK_STROKE_WIDTH_FRACTION) }
+                        ?.let(currentOnStrokeErased)
+                })
+            }
+            .pointerInput(fitted) {
+                detectDragGestures(
+                    onDragStart = { offset -> currentStroke = listOf(offset) },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        currentStroke = currentStroke + change.position
+                    },
+                    onDragEnd = {
+                        val normalized = currentStroke.map { fitted.normalize(it) }
+                        currentStroke = emptyList()
+                        if (normalized.size >= 2) currentOnStrokeAdded(ConfidentialMarkStroke(normalized))
+                    },
+                    onDragCancel = { currentStroke = emptyList() },
+                )
+            }
+    } else {
+        Modifier
+    }
+
     Canvas(
         modifier = modifier
             .onSizeChanged { containerSize = it }
-            .pointerInput(editingEnabled, fitted, marks) {
-                val bounds = fitted
-                if (!editingEnabled || bounds == null) return@pointerInput
-                detectDragGestures(
-                    onDragStart = { offset -> currentStroke = listOf(offset) },
-                    onDrag = { change, _ -> currentStroke = currentStroke + change.position },
-                    onDragEnd = {
-                        val normalized = currentStroke.map { bounds.normalize(it) }
-                        currentStroke = emptyList()
-                        if (normalized.size >= 2) {
-                            onStrokeAdded(ConfidentialMarkStroke(normalized))
-                        } else if (normalized.size == 1) {
-                            val tapped = marks.firstOrNull { stroke ->
-                                isPointNearStroke(normalized[0], stroke, CONFIDENTIAL_MARK_STROKE_WIDTH_FRACTION)
-                            }
-                            tapped?.let(onStrokeErased)
-                        }
-                    },
-                )
-            },
+            .then(editing),
     ) {
         val bounds = fitted ?: return@Canvas
         val liveStroke = currentStroke.takeIf { it.size >= 2 }

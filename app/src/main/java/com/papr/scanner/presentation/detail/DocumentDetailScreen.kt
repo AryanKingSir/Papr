@@ -1,28 +1,27 @@
 package com.papr.scanner.presentation.detail
 
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.NoteAdd
+import androidx.compose.material.icons.automirrored.filled.RotateRight
 import androidx.compose.material.icons.filled.Brush
-import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.FindReplace
 import androidx.compose.material.icons.filled.IosShare
-import androidx.compose.material.icons.filled.NoteAdd
-import androidx.compose.material.icons.automirrored.filled.RotateRight
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -41,6 +40,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,6 +72,7 @@ fun DocumentDetailScreen(
     }
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val currentOnBack by rememberUpdatedState(onBack)
 
     var isEditingTitle by remember { mutableStateOf(false) }
     var titleDraft by remember { mutableStateOf("") }
@@ -79,8 +80,11 @@ fun DocumentDetailScreen(
     var showExportOptions by remember { mutableStateOf(false) }
     var pendingDeletePage by remember { mutableStateOf(false) }
 
-    LaunchedEffect(uiState.isDeleted) {
-        if (uiState.isDeleted) onBack()
+    // Leave exactly once, whether the document was deleted here (its last
+    // page removed) or turns out not to exist - never sit on an empty screen.
+    val shouldLeave = uiState.isDeleted || (!uiState.isLoading && uiState.document == null)
+    LaunchedEffect(shouldLeave) {
+        if (shouldLeave) currentOnBack()
     }
     LaunchedEffect(Unit) {
         viewModel.pdfReady.collect { file ->
@@ -92,6 +96,9 @@ fun DocumentDetailScreen(
             }
             context.startActivity(Intent.createChooser(shareIntent, "Share PDF"))
         }
+    }
+    LaunchedEffect(Unit) {
+        viewModel.errors.collect { message -> Toast.makeText(context, message, Toast.LENGTH_LONG).show() }
     }
 
     val currentPage = uiState.pages.getOrNull(uiState.currentPageIndex)
@@ -123,13 +130,16 @@ fun DocumentDetailScreen(
                 },
                 actions = {
                     if (isEditingTitle) {
-                        TextButton(onClick = {
-                            viewModel.updateTitle(titleDraft)
-                            isEditingTitle = false
-                        }) { Text("Save") }
+                        TextButton(
+                            onClick = {
+                                viewModel.updateTitle(titleDraft)
+                                isEditingTitle = false
+                            },
+                            enabled = titleDraft.isNotBlank(),
+                        ) { Text("Save") }
                     } else {
-                        IconButton(onClick = onAddPagesClick) {
-                            Icon(Icons.Filled.NoteAdd, contentDescription = "Add pages")
+                        IconButton(onClick = onAddPagesClick, enabled = uiState.document != null) {
+                            Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Add pages")
                         }
                         IconButton(onClick = { showExportOptions = true }, enabled = uiState.pages.isNotEmpty()) {
                             Icon(Icons.Filled.IosShare, contentDescription = "Export")
@@ -139,6 +149,18 @@ fun DocumentDetailScreen(
             )
         },
     ) { innerPadding ->
+        if (uiState.isLoading) {
+            Box(
+                modifier = Modifier
+                    .padding(innerPadding)
+                    .fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
+            }
+            return@Scaffold
+        }
+
         Column(modifier = Modifier.padding(innerPadding)) {
             if (uiState.isExporting) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -149,20 +171,26 @@ fun DocumentDetailScreen(
                 currentPageIndex = uiState.currentPageIndex,
                 onPageChanged = viewModel::selectPage,
                 isMarkingConfidential = uiState.isMarkingConfidential,
+                isPlacingSignature = uiState.isPlacingSignature,
                 onMarkStrokeAdded = { page, stroke -> viewModel.addConfidentialMarkStroke(page.id, stroke) },
                 onMarkStrokeErased = { page, stroke -> viewModel.eraseConfidentialMarkStroke(page.id, stroke) },
+                onSignatureTap = { viewModel.setPlacingSignature(true) },
+                onSignaturePlacementChange = { page, x, y, width -> viewModel.updateSignaturePlacement(page.id, x, y, width) },
+                onSignatureRemove = { page -> viewModel.removeSignature(page.id) },
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
             )
 
-            if (uiState.isMarkingConfidential) {
-                Text(
+            when {
+                uiState.isMarkingConfidential -> HintRow(
                     text = "Drag to cover content, tap a mark to remove it. Hidden text may still be found by " +
                         "search or by copying text from an exported PDF.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    onDone = viewModel::toggleMarkingConfidential,
+                )
+                uiState.isPlacingSignature -> HintRow(
+                    text = "Drag the signature to move it. Drag its corner to resize.",
+                    onDone = { viewModel.setPlacingSignature(false) },
                 )
             }
 
@@ -181,12 +209,16 @@ fun DocumentDetailScreen(
                 IconButton(
                     onClick = { currentPage?.let { viewModel.movePage(it.id, -1) } },
                     enabled = currentPage != null && uiState.currentPageIndex > 0,
-                ) { Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "Move page earlier") }
+                ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Move page earlier") }
                 IconButton(onClick = { currentPage?.let { viewModel.rotatePage(it.id) } }, enabled = currentPage != null) {
                     Icon(Icons.AutoMirrored.Filled.RotateRight, contentDescription = "Rotate page")
                 }
                 IconButton(onClick = { showSignatureEditor = true }, enabled = currentPage != null) {
-                    Icon(Icons.Filled.Draw, contentDescription = "Sign page")
+                    Icon(
+                        Icons.Filled.Draw,
+                        contentDescription = "Sign page",
+                        tint = if (uiState.isPlacingSignature) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                    )
                 }
                 IconButton(onClick = { viewModel.toggleMarkingConfidential() }, enabled = currentPage != null) {
                     Icon(
@@ -207,7 +239,7 @@ fun DocumentDetailScreen(
                 IconButton(
                     onClick = { currentPage?.let { viewModel.movePage(it.id, 1) } },
                     enabled = currentPage != null && uiState.currentPageIndex < uiState.pages.size - 1,
-                ) { Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "Move page later") }
+                ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Move page later") }
             }
         }
     }
@@ -245,5 +277,24 @@ fun DocumentDetailScreen(
                 TextButton(onClick = { pendingDeletePage = false }) { Text("Cancel") }
             },
         )
+    }
+}
+
+/** Explains the active editing mode, with a way out of it. */
+@Composable
+private fun HintRow(text: String, onDone: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onDone) { Text("Done") }
     }
 }

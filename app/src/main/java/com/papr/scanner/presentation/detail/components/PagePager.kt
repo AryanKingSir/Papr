@@ -9,6 +9,8 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -16,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.papr.scanner.domain.model.ConfidentialMarkStroke
 import com.papr.scanner.domain.model.Page
 import com.papr.scanner.presentation.common.PageImage
+import com.papr.scanner.presentation.common.rememberImageSize
 import java.io.File
 
 @Composable
@@ -24,11 +27,16 @@ fun PagePager(
     currentPageIndex: Int,
     onPageChanged: (Int) -> Unit,
     isMarkingConfidential: Boolean,
+    isPlacingSignature: Boolean,
     onMarkStrokeAdded: (Page, ConfidentialMarkStroke) -> Unit,
     onMarkStrokeErased: (Page, ConfidentialMarkStroke) -> Unit,
+    onSignatureTap: (Page) -> Unit,
+    onSignaturePlacementChange: (page: Page, x: Float, y: Float, width: Float) -> Unit,
+    onSignatureRemove: (Page) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val pagerState = rememberPagerState(initialPage = currentPageIndex) { pages.size }
+    val currentOnPageChanged by rememberUpdatedState(onPageChanged)
 
     LaunchedEffect(currentPageIndex) {
         if (pagerState.currentPage != currentPageIndex) {
@@ -36,10 +44,15 @@ fun PagePager(
         }
     }
     LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.currentPage }.collect { onPageChanged(it) }
+        snapshotFlow { pagerState.currentPage }.collect { currentOnPageChanged(it) }
     }
 
-    HorizontalPager(state = pagerState, modifier = modifier) { index ->
+    HorizontalPager(
+        state = pagerState,
+        // Drawing a mark or dragging a signature must never turn into a page swipe.
+        userScrollEnabled = !isMarkingConfidential && !isPlacingSignature,
+        modifier = modifier,
+    ) { index ->
         val page = pages.getOrNull(index)
         Box(
             modifier = Modifier
@@ -54,14 +67,30 @@ fun PagePager(
                 contentScale = ContentScale.Fit,
             )
             if (page != null) {
-                ConfidentialMarkOverlay(
-                    imageFile = File(page.imageUri),
-                    marks = page.confidentialMarks,
-                    editingEnabled = isMarkingConfidential && index == currentPageIndex,
-                    onStrokeAdded = { stroke -> onMarkStrokeAdded(page, stroke) },
-                    onStrokeErased = { stroke -> onMarkStrokeErased(page, stroke) },
-                    modifier = Modifier.fillMaxSize(),
-                )
+                val imageSize = rememberImageSize(File(page.imageUri))
+                val isCurrent = index == currentPageIndex
+                if (imageSize != null) {
+                    // Same layering as the PDF export: signature under marks.
+                    page.signature?.let { signature ->
+                        SignatureOverlay(
+                            signature = signature,
+                            imageSize = imageSize,
+                            isPlacing = isPlacingSignature && isCurrent,
+                            onTap = { onSignatureTap(page) }.takeIf { isCurrent && !isMarkingConfidential },
+                            onPlacementChange = { x, y, width -> onSignaturePlacementChange(page, x, y, width) },
+                            onRemove = { onSignatureRemove(page) },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                    ConfidentialMarkOverlay(
+                        imageSize = imageSize,
+                        marks = page.confidentialMarks,
+                        editingEnabled = isMarkingConfidential && isCurrent,
+                        onStrokeAdded = { stroke -> onMarkStrokeAdded(page, stroke) },
+                        onStrokeErased = { stroke -> onMarkStrokeErased(page, stroke) },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
         }
     }

@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -21,6 +21,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.papr.scanner.domain.model.Page
 import com.papr.scanner.presentation.common.PageImage
+import com.papr.scanner.presentation.common.rememberImageSize
 import java.io.File
 
 @Composable
@@ -35,8 +36,10 @@ fun PageThumbnailStrip(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(pages, key = { it.id }) { page ->
-            val isSelected = page.pageIndex == currentPageIndex
+        itemsIndexed(pages, key = { _, page -> page.id }) { index, page ->
+            // List position, not pageIndex - the two only match while page
+            // indices stay contiguous, and selection is by position.
+            val isSelected = index == currentPageIndex
             Box(
                 modifier = Modifier
                     .width(56.dp)
@@ -50,24 +53,34 @@ fun PageThumbnailStrip(
                         ),
                         RoundedCornerShape(8.dp),
                     )
-                    .clickable { onPageSelected(page.pageIndex) },
+                    .clickable { onPageSelected(index) },
             ) {
                 PageImage(
                     file = File(page.imageUri),
-                    contentDescription = "Page ${page.pageIndex + 1}",
+                    contentDescription = "Page ${index + 1}",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
-                if (page.confidentialMarks.isNotEmpty()) {
-                    ConfidentialMarkOverlay(
-                        imageFile = File(page.imageUri),
-                        marks = page.confidentialMarks,
-                        editingEnabled = false,
-                        crop = true,
-                        onStrokeAdded = {},
-                        onStrokeErased = {},
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                if (page.signature != null || page.confidentialMarks.isNotEmpty()) {
+                    val imageSize = rememberImageSize(File(page.imageUri))
+                    if (imageSize != null) {
+                        page.signature?.let { signature ->
+                            SignatureOverlay(
+                                signature = signature,
+                                imageSize = imageSize,
+                                isPlacing = false,
+                                crop = true,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                        ConfidentialMarkOverlay(
+                            imageSize = imageSize,
+                            marks = page.confidentialMarks,
+                            editingEnabled = false,
+                            crop = true,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
             }
         }
