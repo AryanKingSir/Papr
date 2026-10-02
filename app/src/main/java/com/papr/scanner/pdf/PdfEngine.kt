@@ -36,30 +36,24 @@ class PdfEngine(
     ): File = withContext(Dispatchers.IO) {
         val ocrElementsByPage = mutableMapOf<Int, List<OcrTextElement>>()
 
-        bitmapPdfCompiler.compile(pageFiles, outputFile, options.targetSizeBytes) { canvas, bitmap, pageIndex, pageWidthPx, pageHeightPx ->
+        bitmapPdfCompiler.compile(pageFiles, outputFile, options.targetSizeBytes) { canvas, bitmap, pageIndex, placement ->
             if (options.ocrEnabled) {
                 // Injected as raw PDF operators, bypassing Canvas entirely - so unlike
-                // the signature below, this gets none of BitmapPdfCompiler's own
-                // scale/translate for free and has to redo both by hand:
-                //  - offset by the same centering translate the page's bitmap got,
-                //    since OcrTextStamper's coordinates are relative to that bitmap;
-                //  - flip Y: OcrTextElement.y comes from a top-down Android bounding
-                //    box, but PDF space is bottom-up.
-                val scale = BitmapPdfCompiler.POINTS_PER_PIXEL
-                val offsetXPx = (pageWidthPx - bitmap.width) / 2f
-                val offsetYPx = (pageHeightPx - bitmap.height) / 2f
+                // the overlays below, this doesn't get the page's fit transform for
+                // free; placement applies it by hand (and flips Y, since PDF space
+                // is bottom-up while OcrTextStamper's boxes are top-down).
                 ocrElementsByPage[pageIndex] = ocrTextStamper.recognize(bitmap).map { element ->
                     element.copy(
-                        x = (element.x + offsetXPx) * scale,
-                        y = (pageHeightPx - (element.y + offsetYPx)) * scale,
-                        fontSize = element.fontSize * scale,
-                        width = element.width * scale,
+                        x = placement.toPdfX(element.x),
+                        y = placement.toPdfY(element.y),
+                        fontSize = placement.toPdfLength(element.fontSize),
+                        width = placement.toPdfLength(element.width),
                     )
                 }
             }
-            options.signature?.let { placement ->
-                if (placement.pageIndex == pageIndex) {
-                    signatureStamper.stamp(canvas, placement.bitmap, bitmap.width, bitmap.height)
+            options.signature?.let { signature ->
+                if (signature.pageIndex == pageIndex) {
+                    signatureStamper.stamp(canvas, signature.bitmap, bitmap.width, bitmap.height)
                 }
             }
             options.confidentialMarksByPageIndex[pageIndex]?.let { marks ->

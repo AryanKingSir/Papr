@@ -58,12 +58,7 @@ object FileUtils {
     suspend fun rotateJpeg(file: File, degrees: Float) = withContext(Dispatchers.IO) {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.absolutePath, bounds)
-        val maxDimension = maxOf(bounds.outWidth, bounds.outHeight)
-        val sampleSize = if (maxDimension > MAX_ROTATE_DIMENSION) {
-            maxOf(1, maxDimension / MAX_ROTATE_DIMENSION)
-        } else {
-            1
-        }
+        val sampleSize = sampleSizeFor(maxOf(bounds.outWidth, bounds.outHeight), MAX_ROTATE_DIMENSION)
         val original = BitmapFactory.decodeFile(
             file.absolutePath,
             BitmapFactory.Options().apply { inSampleSize = sampleSize },
@@ -109,8 +104,7 @@ object FileUtils {
     suspend fun decodeDownsampled(file: File, maxDimension: Int): Bitmap = withContext(Dispatchers.IO) {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.absolutePath, bounds)
-        val longestSide = maxOf(bounds.outWidth, bounds.outHeight)
-        val sampleSize = if (longestSide > maxDimension) maxOf(1, longestSide / maxDimension) else 1
+        val sampleSize = sampleSizeFor(maxOf(bounds.outWidth, bounds.outHeight), maxDimension)
         BitmapFactory.decodeFile(
             file.absolutePath,
             BitmapFactory.Options().apply { inSampleSize = sampleSize },
