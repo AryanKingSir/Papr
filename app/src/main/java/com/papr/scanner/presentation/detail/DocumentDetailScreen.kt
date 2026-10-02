@@ -59,7 +59,7 @@ fun DocumentDetailScreen(
     documentId: Long,
     onBack: () -> Unit,
     onAddPagesClick: () -> Unit,
-    onReplacePageClick: (pageId: Long, pageIndex: Int) -> Unit,
+    onReplacePageClick: (pageId: Long) -> Unit,
 ) {
     val viewModel = paprViewModel { container ->
         DocumentDetailViewModel(documentId, container.documentRepository, container.pdfEngine, container.appContext)
@@ -190,7 +190,7 @@ fun DocumentDetailScreen(
                     )
                 }
                 IconButton(
-                    onClick = { currentPage?.let { onReplacePageClick(it.id, it.pageIndex) } },
+                    onClick = { currentPage?.let { onReplacePageClick(it.id) } },
                     enabled = currentPage != null,
                 ) {
                     Icon(Icons.Filled.FindReplace, contentDescription = "Replace page")

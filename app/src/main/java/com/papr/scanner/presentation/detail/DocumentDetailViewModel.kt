@@ -110,7 +110,7 @@ class DocumentDetailViewModel(
                     // history: reading it right after a DB write is a real race, not
                     // a hypothetical one).
                     if (page.pageIndex == 0) {
-                        FileUtils.generateThumbnail(appContext, documentId, File(page.imageUri), page.confidentialMarks)
+                        FileUtils.generateThumbnail(appContext, page)
                     }
                     touchDocument()
                 }
@@ -141,7 +141,7 @@ class DocumentDetailViewModel(
                         else -> null
                     }
                     newFirstPage?.let {
-                        FileUtils.generateThumbnail(appContext, documentId, File(it.imageUri), it.confidentialMarks)
+                        FileUtils.generateThumbnail(appContext, it)
                     }
                     touchDocument()
                 }
@@ -177,12 +177,7 @@ class DocumentDetailViewModel(
                             document.copy(pageCount = remaining.size, updatedAt = System.currentTimeMillis())
                         )
                     }
-                    FileUtils.generateThumbnail(
-                        appContext,
-                        documentId,
-                        File(remaining.first().imageUri),
-                        remaining.first().confidentialMarks,
-                    )
+                    FileUtils.generateThumbnail(appContext, remaining.first())
                 }
             }.onFailure { e ->
                 _errors.emit(e.message ?: "Failed to delete page")
@@ -230,7 +225,7 @@ class DocumentDetailViewModel(
                     val updated = page.copy(confidentialMarks = page.confidentialMarks + stroke)
                     documentRepository.updatePage(updated)
                     if (page.pageIndex == 0) {
-                        FileUtils.generateThumbnail(appContext, documentId, File(page.imageUri), updated.confidentialMarks)
+                        FileUtils.generateThumbnail(appContext, updated)
                     }
                     touchDocument()
                 }
@@ -247,7 +242,7 @@ class DocumentDetailViewModel(
                     val updated = page.copy(confidentialMarks = page.confidentialMarks - stroke)
                     documentRepository.updatePage(updated)
                     if (page.pageIndex == 0) {
-                        FileUtils.generateThumbnail(appContext, documentId, File(page.imageUri), updated.confidentialMarks)
+                        FileUtils.generateThumbnail(appContext, updated)
                     }
                     touchDocument()
                 }

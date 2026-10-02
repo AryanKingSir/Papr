@@ -50,7 +50,7 @@ class DocumentMerger(
         }
         documentRepository.insertPages(newPages)
 
-        val thumbnail = FileUtils.generateThumbnail(appContext, newDocumentId, File(newPages.first().imageUri))
+        val thumbnail = FileUtils.generateThumbnail(appContext, newPages.first())
         documentRepository.updateDocument(
             Document(
                 id = newDocumentId,

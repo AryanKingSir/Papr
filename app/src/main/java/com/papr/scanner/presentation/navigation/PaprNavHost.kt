@@ -22,7 +22,7 @@ fun PaprNavHost(
     navController: NavHostController,
     onScanClick: () -> Unit,
     onAddPagesClick: (documentId: Long) -> Unit,
-    onReplacePageClick: (documentId: Long, pageId: Long, pageIndex: Int) -> Unit,
+    onReplacePageClick: (documentId: Long, pageId: Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     NavHost(navController = navController, startDestination = Screen.Home.route, modifier = modifier) {
@@ -54,7 +54,7 @@ fun PaprNavHost(
                     documentId = documentId,
                     onBack = { navController.popBackStack() },
                     onAddPagesClick = { onAddPagesClick(documentId) },
-                    onReplacePageClick = { pageId, pageIndex -> onReplacePageClick(documentId, pageId, pageIndex) },
+                    onReplacePageClick = { pageId -> onReplacePageClick(documentId, pageId) },
                 )
             }
         }

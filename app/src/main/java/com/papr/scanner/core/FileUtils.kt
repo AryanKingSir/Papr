@@ -7,8 +7,9 @@ import android.graphics.Canvas
 import android.graphics.Matrix
 import android.net.Uri
 import androidx.core.content.FileProvider
-import com.papr.scanner.domain.model.ConfidentialMarkStroke
+import com.papr.scanner.domain.model.Page
 import com.papr.scanner.pdf.ConfidentialMarkRenderer
+import com.papr.scanner.pdf.SignatureStamper
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
@@ -71,34 +72,45 @@ object FileUtils {
     }
 
     /**
-     * Generates a small JPEG thumbnail from a page image, overwriting any
-     * previous one for this document. [confidentialMarks] (if any) are baked
-     * into this cached thumbnail so a marked page never shows unredacted in
-     * the home grid preview - the live full-size page file itself is never
-     * touched, only this derived cache artifact.
+     * Generates the document's small JPEG thumbnail from [page] (its first page),
+     * overwriting any previous one. The page's signature and confidential marks
+     * are baked into this cached thumbnail so a marked page never shows
+     * unredacted in the home grid - the page image file itself is never touched,
+     * only this derived cache artifact.
      */
-    suspend fun generateThumbnail(
-        context: Context,
-        documentId: Long,
-        sourcePageFile: File,
-        confidentialMarks: List<ConfidentialMarkStroke> = emptyList(),
-    ): File =
+    suspend fun generateThumbnail(context: Context, page: Page): File =
         withContext(Dispatchers.IO) {
+            val sourcePageFile = File(page.imageUri)
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(sourcePageFile.absolutePath, bounds)
             val sampleSize = maxOf(1, minOf(bounds.outWidth, bounds.outHeight) / THUMBNAIL_MAX_DIMENSION)
+            // inMutable: overlays are drawn straight onto the decoded bitmap, and
+            // Canvas() rejects the immutable bitmaps BitmapFactory returns by default.
             val bitmap = BitmapFactory.decodeFile(
                 sourcePageFile.absolutePath,
-                BitmapFactory.Options().apply { inSampleSize = sampleSize },
+                BitmapFactory.Options().apply {
+                    inSampleSize = sampleSize
+                    inMutable = true
+                },
             ) ?: throw IOException("Failed to decode bitmap: ${sourcePageFile.absolutePath}")
-            if (confidentialMarks.isNotEmpty()) {
-                ConfidentialMarkRenderer().draw(Canvas(bitmap), confidentialMarks, bitmap.width, bitmap.height)
+            val canvas = Canvas(bitmap)
+            page.signature?.let { SignatureStamper().draw(canvas, it, bitmap.width, bitmap.height) }
+            if (page.confidentialMarks.isNotEmpty()) {
+                ConfidentialMarkRenderer().draw(canvas, page.confidentialMarks, bitmap.width, bitmap.height)
             }
-            val destination = thumbnailFile(context, documentId)
+            val destination = thumbnailFile(context, page.documentId)
             destination.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it) }
             bitmap.recycle()
             destination
         }
+
+    /** An image file's width / height, read from its header only (no pixel decode). */
+    suspend fun imageAspectRatio(file: File): Float = withContext(Dispatchers.IO) {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw IOException("Failed to read image size: ${file.absolutePath}")
+        bounds.outWidth / bounds.outHeight.toFloat()
+    }
 
     /** Decodes a bitmap capped at [maxDimension] on its longest side, to bound memory for a one-off read (e.g. OCR). */
     suspend fun decodeDownsampled(file: File, maxDimension: Int): Bitmap = withContext(Dispatchers.IO) {
