@@ -151,7 +151,8 @@ fun HomeScreen(
                 if (uiState.hasActiveFilters) NoMatchesState() else EmptyState(onScanClick = onScanClick)
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
+                    // Two columns on a portrait phone (down to 360dp wide), more in landscape or on tablets.
+                    columns = GridCells.Adaptive(minSize = 150.dp),
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),

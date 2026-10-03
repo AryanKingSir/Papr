@@ -4,7 +4,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,7 +45,13 @@ fun ExportOptionsSheet(
     var password by remember { mutableStateOf("") }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+        // Scrolls so Export stays reachable when the options don't fit: landscape,
+        // large text, or with the compression and password fields both open.
+        Column(
+            modifier = Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+        ) {
             Text("Export options", style = androidx.compose.material3.MaterialTheme.typography.titleLarge)
 
             OptionRow(

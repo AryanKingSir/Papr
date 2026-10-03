@@ -35,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.createSavedStateHandle
 import com.papr.scanner.domain.model.Document
 import com.papr.scanner.presentation.common.PageImage
 import com.papr.scanner.presentation.common.paprViewModel
@@ -48,7 +49,7 @@ fun MergeConfirmScreen(
     onMergeComplete: (documentId: Long) -> Unit,
 ) {
     val viewModel = paprViewModel { container ->
-        MergeConfirmViewModel(documentIds, container.documentRepository, container.documentMerger)
+        MergeConfirmViewModel(documentIds, createSavedStateHandle(), container.documentRepository, container.documentMerger)
     }
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current

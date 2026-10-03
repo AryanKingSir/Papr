@@ -5,11 +5,16 @@ import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -44,7 +49,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.papr.scanner.core.FileUtils
 import com.papr.scanner.presentation.common.paprViewModel
@@ -75,7 +84,8 @@ fun DocumentDetailScreen(
     val currentOnBack by rememberUpdatedState(onBack)
 
     var isEditingTitle by remember { mutableStateOf(false) }
-    var titleDraft by remember { mutableStateOf("") }
+    var titleDraft by remember { mutableStateOf(TextFieldValue()) }
+    val titleFocus = remember { FocusRequester() }
     var showSignatureEditor by remember { mutableStateOf(false) }
     var showExportOptions by remember { mutableStateOf(false) }
     var pendingDeletePage by remember { mutableStateOf(false) }
@@ -85,6 +95,10 @@ fun DocumentDetailScreen(
     val shouldLeave = uiState.isDeleted || (!uiState.isLoading && uiState.document == null)
     LaunchedEffect(shouldLeave) {
         if (shouldLeave) currentOnBack()
+    }
+    // Tapping the title should go straight to typing, not need a second tap on the field.
+    LaunchedEffect(isEditingTitle) {
+        if (isEditingTitle) titleFocus.requestFocus()
     }
     LaunchedEffect(Unit) {
         viewModel.pdfReady.collect { file ->
@@ -112,12 +126,15 @@ fun DocumentDetailScreen(
                             value = titleDraft,
                             onValueChange = { titleDraft = it },
                             singleLine = true,
+                            modifier = Modifier.focusRequester(titleFocus),
                         )
                     } else {
                         Text(
                             text = uiState.document?.title.orEmpty(),
                             modifier = Modifier.clickable {
-                                titleDraft = uiState.document?.title.orEmpty()
+                                val title = uiState.document?.title.orEmpty()
+                                // All selected, so typing replaces it; arrow keys or a tap keep it.
+                                titleDraft = TextFieldValue(title, selection = TextRange(0, title.length))
                                 isEditingTitle = true
                             },
                         )
@@ -132,10 +149,10 @@ fun DocumentDetailScreen(
                     if (isEditingTitle) {
                         TextButton(
                             onClick = {
-                                viewModel.updateTitle(titleDraft)
+                                viewModel.updateTitle(titleDraft.text)
                                 isEditingTitle = false
                             },
-                            enabled = titleDraft.isNotBlank(),
+                            enabled = titleDraft.text.isNotBlank(),
                         ) { Text("Save") }
                     } else {
                         IconButton(onClick = onAddPagesClick, enabled = uiState.document != null) {
@@ -161,7 +178,8 @@ fun DocumentDetailScreen(
             return@Scaffold
         }
 
-        Column(modifier = Modifier.padding(innerPadding)) {
+        // The page and its tools as pieces, so landscape can lay them out side by side.
+        val pageArea: @Composable ColumnScope.() -> Unit = {
             if (uiState.isExporting) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
@@ -199,47 +217,67 @@ fun DocumentDetailScreen(
                 currentPageIndex = uiState.currentPageIndex,
                 onPageSelected = viewModel::selectPage,
             )
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+        }
+        val pageActions: @Composable () -> Unit = {
+            IconButton(
+                onClick = { currentPage?.let { viewModel.movePage(it.id, -1) } },
+                enabled = currentPage != null && uiState.currentPageIndex > 0,
+            ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Move page earlier") }
+            IconButton(onClick = { currentPage?.let { viewModel.rotatePage(it.id) } }, enabled = currentPage != null) {
+                Icon(Icons.AutoMirrored.Filled.RotateRight, contentDescription = "Rotate page")
+            }
+            IconButton(onClick = { showSignatureEditor = true }, enabled = currentPage != null) {
+                Icon(
+                    Icons.Filled.Draw,
+                    contentDescription = "Sign page",
+                    tint = if (uiState.isPlacingSignature) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                )
+            }
+            IconButton(onClick = { viewModel.toggleMarkingConfidential() }, enabled = currentPage != null) {
+                Icon(
+                    Icons.Filled.Brush,
+                    contentDescription = "Mark confidential",
+                    tint = if (uiState.isMarkingConfidential) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                )
+            }
+            IconButton(
+                onClick = { currentPage?.let { onReplacePageClick(it.id) } },
+                enabled = currentPage != null,
             ) {
-                IconButton(
-                    onClick = { currentPage?.let { viewModel.movePage(it.id, -1) } },
-                    enabled = currentPage != null && uiState.currentPageIndex > 0,
-                ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Move page earlier") }
-                IconButton(onClick = { currentPage?.let { viewModel.rotatePage(it.id) } }, enabled = currentPage != null) {
-                    Icon(Icons.AutoMirrored.Filled.RotateRight, contentDescription = "Rotate page")
+                Icon(Icons.Filled.FindReplace, contentDescription = "Replace page")
+            }
+            IconButton(onClick = { pendingDeletePage = true }, enabled = currentPage != null) {
+                Icon(Icons.Filled.Delete, contentDescription = "Delete page")
+            }
+            IconButton(
+                onClick = { currentPage?.let { viewModel.movePage(it.id, 1) } },
+                enabled = currentPage != null && uiState.currentPageIndex < uiState.pages.size - 1,
+            ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Move page later") }
+        }
+
+        BoxWithConstraints(modifier = Modifier.padding(innerPadding)) {
+            if (maxWidth > maxHeight) {
+                // Landscape: the tools move to a rail on the right so the page gets the full height.
+                Row {
+                    Column(modifier = Modifier.weight(1f), content = pageArea)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 4.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.SpaceEvenly,
+                    ) { pageActions() }
                 }
-                IconButton(onClick = { showSignatureEditor = true }, enabled = currentPage != null) {
-                    Icon(
-                        Icons.Filled.Draw,
-                        contentDescription = "Sign page",
-                        tint = if (uiState.isPlacingSignature) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                    )
+            } else {
+                Column {
+                    pageArea()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                    ) { pageActions() }
                 }
-                IconButton(onClick = { viewModel.toggleMarkingConfidential() }, enabled = currentPage != null) {
-                    Icon(
-                        Icons.Filled.Brush,
-                        contentDescription = "Mark confidential",
-                        tint = if (uiState.isMarkingConfidential) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                    )
-                }
-                IconButton(
-                    onClick = { currentPage?.let { onReplacePageClick(it.id) } },
-                    enabled = currentPage != null,
-                ) {
-                    Icon(Icons.Filled.FindReplace, contentDescription = "Replace page")
-                }
-                IconButton(onClick = { pendingDeletePage = true }, enabled = currentPage != null) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete page")
-                }
-                IconButton(
-                    onClick = { currentPage?.let { viewModel.movePage(it.id, 1) } },
-                    enabled = currentPage != null && uiState.currentPageIndex < uiState.pages.size - 1,
-                ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Move page later") }
             }
         }
     }
@@ -265,8 +303,17 @@ fun DocumentDetailScreen(
     if (pendingDeletePage) {
         AlertDialog(
             onDismissRequest = { pendingDeletePage = false },
-            title = { Text("Delete this page?") },
-            text = { Text("This can't be undone.") },
+            // Deleting the only page deletes the document too - say so up front.
+            title = { Text(if (uiState.pages.size == 1) "Delete this document?" else "Delete this page?") },
+            text = {
+                Text(
+                    if (uiState.pages.size == 1) {
+                        "This is its only page, so the whole document will be deleted. This can't be undone."
+                    } else {
+                        "This can't be undone."
+                    }
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     currentPage?.let { viewModel.deletePage(it.id) }

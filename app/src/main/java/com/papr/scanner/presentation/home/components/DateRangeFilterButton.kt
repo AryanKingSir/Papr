@@ -1,7 +1,7 @@
 package com.papr.scanner.presentation.home.components
 
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -63,9 +63,10 @@ fun DateRangeFilterButton(
             DateRangePicker(
                 state = dateRangePickerState,
                 showModeToggle = false,
+                // A cap rather than a fixed height, so the dialog shrinks to fit a landscape screen.
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(500.dp),
+                    .heightIn(max = 500.dp),
             )
         }
     }

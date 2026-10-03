@@ -1,6 +1,7 @@
 package com.papr.scanner.presentation.merge
 
 import android.util.Log
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.papr.scanner.data.repository.DocumentMerger
@@ -18,6 +19,7 @@ import kotlinx.coroutines.launch
 
 class MergeConfirmViewModel(
     documentIds: List<Long>,
+    private val savedState: SavedStateHandle,
     private val documentRepository: DocumentRepository,
     private val documentMerger: DocumentMerger,
 ) : ViewModel() {
@@ -33,16 +35,20 @@ class MergeConfirmViewModel(
 
     init {
         viewModelScope.launch {
-            val documents = documentIds.mapNotNull { id -> documentRepository.getDocumentById(id).first() }
+            // The user's reordering, removals and title edits come back if the process
+            // was killed while they were on this screen.
+            val ids = savedState.get<LongArray>(KEY_ORDER)?.toList() ?: documentIds
+            val documents = ids.mapNotNull { id -> documentRepository.getDocumentById(id).first() }
             _uiState.value = MergeConfirmUiState(
                 documents = documents,
-                title = defaultMergeTitle(documents.map { it.title }),
+                title = savedState[KEY_TITLE] ?: defaultMergeTitle(documents.map { it.title }),
             )
         }
     }
 
     fun onTitleChange(title: String) {
         _uiState.value = _uiState.value.copy(title = title)
+        savedState[KEY_TITLE] = title
     }
 
     fun moveDocument(document: Document, direction: Int) {
@@ -62,6 +68,8 @@ class MergeConfirmViewModel(
             documents = documents,
             title = titleAfterListChange(state.title, state.documents.map { it.title }, documents.map { it.title }),
         )
+        savedState[KEY_ORDER] = documents.map { it.id }.toLongArray()
+        savedState[KEY_TITLE] = _uiState.value.title
     }
 
     fun merge() {
@@ -84,6 +92,8 @@ class MergeConfirmViewModel(
 }
 
 private const val MAX_DEFAULT_TITLE_LENGTH = 60
+private const val KEY_ORDER = "merge_order"
+private const val KEY_TITLE = "merge_title"
 
 /** Builds a default merged-document title by joining the source titles, truncated with an ellipsis if the join is too long. */
 internal fun defaultMergeTitle(titles: List<String>): String {

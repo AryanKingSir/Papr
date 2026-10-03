@@ -89,7 +89,9 @@ class MainActivity : ComponentActivity() {
             }
             .addOnFailureListener { error ->
                 Log.e("Papr", "Failed to start scanner", error)
-                showToast("Couldn't open the scanner. Please try again.")
+                // The scanner is part of Google Play services, so an outdated or missing copy is the
+                // usual cause - retrying alone won't help then.
+                showToast("Couldn't open the scanner. Update Google Play services and try again.")
             }
     }
 
