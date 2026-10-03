@@ -92,4 +92,16 @@ Work through sections in order if convenient (later sections build on documents/
 3. The home screen's top bar shows a small paper icon immediately before "Papr", visible and correctly colored in both light and dark theme. ✓ emulator 2026-10-03 (light and dark)
 4. General smoke test after the targetSdk 37 bump: nothing looks clipped or misaligned around the status/navigation bars. ✓ emulator 2026-10-03
 5. Export filename: export a document you've renamed in-app (e.g. to "Bio"), save the shared PDF somewhere, and check the actual resulting filename matches the in-app title. ✓ emulator (the exported file is `7sept.pdf` for a document titled "7sept"; the old `export_<timestamp>.pdf` naming was replaced on Sep 12)
-6. Open the Pro sheet with no internet — it says it couldn't reach Google Play and offers "Try again", instead of spinning forever.
+6. Open the Pro sheet with no internet — it says it couldn't reach Google Play and offers "Try again", instead of spinning forever. ✓ emulator 2026-10-03 (no Play Store on the emulator; still worth checking with airplane mode on a phone)
+
+## 8. Release build & robustness
+
+Run these on the **release** build - it's what ships, and R8 minification can break things the debug build never shows (it did: the release build crashed on launch until 2b319d2). To install it on a phone signed with your local debug key: `./gradlew :app:assembleRelease`, then `zipalign -p 4` and `apksigner sign --ks ~/.android/debug.keystore` (password `android`) the `app-release-unsigned.apk` from `app/build/outputs/apk/release/`, and `adb install -r` it.
+
+1. The release build launches, and scanning, OCR, signing, marking, export (with compression, password and OCR), merge, delete and the Pro sheet all work. ✓ emulator 2026-10-03 (everything except the camera scan and real OCR, which this emulator can't do)
+2. Background the app, let Android kill it (or `adb shell am kill com.papr.scanner`), then return - it reopens on the same screen; on the merge screen, your order and title are kept. ✓ emulator 2026-10-03
+3. With "Don't keep activities" on: export and come back from the share sheet, and leave the app mid-signature - nothing is lost or crashes. ✓ emulator 2026-10-03
+4. Landscape: the home grid shows more columns, the detail screen's tools move to a side rail, the date picker fits, and every export option (including Export itself) is reachable. ✓ emulator 2026-10-03
+5. Largest font size: nothing overlaps, and the export sheet still scrolls to Export. ✓ emulator 2026-10-03
+6. A fresh install (no documents): "No documents yet" with a Scan button; the Pro sheet without Google Play says it couldn't reach it, with Try again. ✓ emulator 2026-10-03
+7. Random-input stress test (`adb shell monkey -p com.papr.scanner ...`) - no crashes or freezes. ✓ emulator 2026-10-03 (20,000 events across debug and release)
