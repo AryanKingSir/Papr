@@ -1,6 +1,9 @@
 package com.papr.scanner.presentation.home
 
 import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.papr.scanner.data.repository.DocumentDeleter
@@ -108,7 +111,16 @@ class HomeViewModel(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
+    /**
+     * What the search field shows. Compose state rather than [HomeUiState.searchQuery]:
+     * that only catches up after the async search pipeline runs, and a text field fed a
+     * stale value mid-typing resets its cursor, scrambling or duplicating letters.
+     */
+    var searchFieldText by mutableStateOf("")
+        private set
+
     fun onSearchQueryChange(query: String) {
+        searchFieldText = query
         searchQuery.value = query
     }
 

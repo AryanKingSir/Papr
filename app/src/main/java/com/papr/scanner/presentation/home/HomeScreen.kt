@@ -87,7 +87,12 @@ fun HomeScreen(
                             Icon(Icons.Default.Delete, contentDescription = "Delete selected")
                         }
                         IconButton(
-                            onClick = { onMergeClick(uiState.selectedDocumentIds) },
+                            onClick = {
+                                onMergeClick(uiState.selectedDocumentIds)
+                                // Like Delete, acting on the selection ends it - otherwise Home is
+                                // still mid-selection when you come back from the merged document.
+                                viewModel.clearSelection()
+                            },
                             enabled = uiState.selectedDocumentIds.size >= 2,
                         ) {
                             Icon(Icons.AutoMirrored.Filled.MergeType, contentDescription = "Merge selected")
@@ -123,7 +128,7 @@ fun HomeScreen(
         },
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding)) {
-            DocumentSearchBar(query = uiState.searchQuery, onQueryChange = viewModel::onSearchQueryChange)
+            DocumentSearchBar(query = viewModel.searchFieldText, onQueryChange = viewModel::onSearchQueryChange)
             uiState.selectedDateRange?.let { range ->
                 DateRangeChip(
                     range = range,
@@ -177,7 +182,7 @@ fun HomeScreen(
         AlertDialog(
             onDismissRequest = { pendingDeleteSelection = false },
             title = { Text(if (count == 1) "Delete this document?" else "Delete $count documents?") },
-            text = { Text("This removes all their pages. This can't be undone.") },
+            text = { Text("This removes all ${if (count == 1) "its" else "their"} pages. This can't be undone.") },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.deleteSelected()

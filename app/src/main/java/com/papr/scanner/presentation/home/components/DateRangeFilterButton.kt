@@ -2,7 +2,6 @@ package com.papr.scanner.presentation.home.components
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -66,8 +65,7 @@ fun DateRangeFilterButton(
                 showModeToggle = false,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(500.dp)
-                    .padding(16.dp),
+                    .height(500.dp),
             )
         }
     }

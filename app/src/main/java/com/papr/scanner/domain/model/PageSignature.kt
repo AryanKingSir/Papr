@@ -33,19 +33,29 @@ fun PageSignature.clampedTo(pageAspect: Float): PageSignature {
 }
 
 /**
- * Follows a 90° clockwise page rotation: the signature's center rotates with
- * the page, while the signature itself stays upright (it's an annotation, not
- * page content) and keeps its width as a fraction of the new page width.
- * [newPageAspect] is the page's width / height *after* rotation.
+ * Follows a 90° clockwise page rotation. The signature stays upright (it's an
+ * annotation, not page content) and keeps its size relative to the page content.
+ * Its position is rotated as a fraction of the room it has to move in rather
+ * than by its center: an upright, non-square signature doesn't always fit around
+ * its rotated center, and clamping it back onto the page made it drift a little
+ * further with every turn. This way corners map to corners, it never leaves the
+ * page, and four turns return it exactly. [newPageAspect] is the page's
+ * width / height *after* rotation.
  */
 fun PageSignature.rotatedClockwise(newPageAspect: Float): PageSignature {
-    val centerX = x + width / 2f
-    val centerY = y + heightFraction(1f / newPageAspect) / 2f
-    return copy(
-        x = (1f - centerY) - width / 2f,
-        y = centerX - heightFraction(newPageAspect) / 2f,
+    val oldPageAspect = 1f / newPageAspect
+    val u = fractionOfRoom(x, 1f - width)
+    val v = fractionOfRoom(y, 1f - heightFraction(oldPageAspect))
+    // The new page is as wide as the old one was tall, so the same physical width is a smaller fraction of it.
+    val resized = copy(width = width * oldPageAspect)
+    return resized.copy(
+        x = (1f - v) * (1f - resized.width),
+        y = u * (1f - resized.heightFraction(newPageAspect)),
     ).clampedTo(newPageAspect)
 }
+
+private fun fractionOfRoom(position: Float, room: Float): Float =
+    if (room <= 0f) 0f else (position / room).coerceIn(0f, 1f)
 
 /** Where a freshly drawn signature lands: the bottom-right corner, a third of the page wide. */
 fun defaultSignaturePlacement(imagePath: String, aspectRatio: Float, pageAspect: Float): PageSignature {

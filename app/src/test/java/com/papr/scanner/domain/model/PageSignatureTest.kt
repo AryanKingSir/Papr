@@ -47,15 +47,35 @@ class PageSignatureTest {
     }
 
     @Test
-    fun `rotating clockwise moves the center with the page and keeps the width`() {
-        // On a square page, center (0.25, 0.25) rotates to (0.75, 0.25)
-        val original = PageSignature("s.png", x = 0.15f, y = 0.2f, width = 0.2f, aspectRatio = 0.5f)
+    fun `rotating clockwise on a square page keeps the width and turns a centered signature in place`() {
+        val original = PageSignature("s.png", x = 0.4f, y = 0.45f, width = 0.2f, aspectRatio = 0.5f)
 
         val result = original.rotatedClockwise(newPageAspect = 1f)
 
         assertEquals(0.2f, result.width, 0.0001f)
-        assertEquals(0.75f, result.x + result.width / 2f, 0.0001f)
-        assertEquals(0.25f, result.y + result.heightFraction(1f) / 2f, 0.0001f)
+        assertEquals(0.5f, result.x + result.width / 2f, 0.0001f)
+        assertEquals(0.5f, result.y + result.heightFraction(1f) / 2f, 0.0001f)
+    }
+
+    @Test
+    fun `rotating clockwise moves a bottom-right signature to the bottom-left`() {
+        val pageAspect = 0.75f
+        val original = signature(x = 0.7f, width = 0.3f).let { it.copy(y = 1f - it.heightFraction(pageAspect)) }
+
+        val result = original.rotatedClockwise(newPageAspect = 1f / pageAspect)
+
+        assertEquals(0f, result.x, 0.0001f)
+        assertEquals(1f, result.y + result.heightFraction(1f / pageAspect), 0.0001f)
+    }
+
+    @Test
+    fun `rotating onto a differently shaped page keeps the signature's size on the page`() {
+        // A 1600x2200 page turns into a 2200x1600 one: 0.5 of 1600px (800px) is 800/2200 of the new width.
+        val original = signature(x = 0.2f, y = 0.4f, width = 0.5f)
+
+        val result = original.rotatedClockwise(newPageAspect = 2200f / 1600f)
+
+        assertEquals(800f / 2200f, result.width, 0.0001f)
     }
 
     @Test
@@ -76,5 +96,20 @@ class PageSignatureTest {
 
         assertEquals(original.x, result.x, 0.0001f)
         assertEquals(original.y, result.y, 0.0001f)
+    }
+
+    @Test
+    fun `four rotations on a non-square page return to the start`() {
+        // The placement that drifted on-device: a large signature near the bottom of a 1600x2200 page.
+        val original = PageSignature("s.png", x = 0.208f, y = 0.7946f, width = 0.498f, aspectRatio = 0.4663f)
+        val portrait = 1600f / 2200f
+        val landscape = 2200f / 1600f
+
+        val result = original.rotatedClockwise(landscape).rotatedClockwise(portrait)
+            .rotatedClockwise(landscape).rotatedClockwise(portrait)
+
+        assertEquals(original.x, result.x, 0.0001f)
+        assertEquals(original.y, result.y, 0.0001f)
+        assertEquals(original.width, result.width, 0.0001f)
     }
 }
