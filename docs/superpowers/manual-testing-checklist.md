@@ -88,7 +88,7 @@ Work through sections in order if convenient (later sections build on documents/
 ## 7. Visual polish & platform details
 
 1. Home grid shows "1 Page" / "N Pages", not "1p"/"4p". ✓ emulator 2026-10-03
-2. The app icon (launcher, recents/overview) has no visible white border/ring, and the logo looks appropriately zoomed in. ✓ emulator 2026-10-03 (no ring; the paper art is clipped by the round mask — eyeball it on a phone)
+2. The app icon (launcher, recents/overview) has no visible white border/ring, and the logo looks appropriately zoomed in. ✓ emulator 2026-10-03 (no ring; the paper now fits inside the round mask, 7480aac)
 3. The home screen's top bar shows a small paper icon immediately before "Papr", visible and correctly colored in both light and dark theme. ✓ emulator 2026-10-03 (light and dark)
 4. General smoke test after the targetSdk 37 bump: nothing looks clipped or misaligned around the status/navigation bars. ✓ emulator 2026-10-03
 5. Export filename: export a document you've renamed in-app (e.g. to "Bio"), save the shared PDF somewhere, and check the actual resulting filename matches the in-app title. ✓ emulator (the exported file is `7sept.pdf` for a document titled "7sept"; the old `export_<timestamp>.pdf` naming was replaced on Sep 12)
