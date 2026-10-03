@@ -21,6 +21,26 @@ class MergeConfirmViewModelTest {
     }
 
     @Test
+    fun `an untouched default title follows reordering and removal`() {
+        val result = titleAfterListChange(
+            currentTitle = "Invoice + Notes + Receipt",
+            oldTitles = listOf("Invoice", "Notes", "Receipt"),
+            newTitles = listOf("Receipt", "Invoice"),
+        )
+        assertEquals("Receipt + Invoice", result)
+    }
+
+    @Test
+    fun `a title the user edited is left alone when the list changes`() {
+        val result = titleAfterListChange(
+            currentTitle = "Tax 2026",
+            oldTitles = listOf("Invoice", "Notes", "Receipt"),
+            newTitles = listOf("Receipt", "Invoice"),
+        )
+        assertEquals("Tax 2026", result)
+    }
+
+    @Test
     fun `swaps an item with its next neighbor`() {
         val result = reordered(listOf("a", "b", "c"), index = 0, direction = 1)
         assertEquals(listOf("b", "a", "c"), result)

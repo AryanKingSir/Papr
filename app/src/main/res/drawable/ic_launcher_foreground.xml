@@ -3,13 +3,24 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M26.4,19.5 L65.5,19.5 L81.6,35.6 L81.6,88.5 A4.6,4.6 0 0 1 77,93.1 L26.4,93.1 A4.6,4.6 0 0 1 21.8,88.5 L21.8,24.1 A4.6,4.6 0 0 1 26.4,19.5 Z" />
-    <path
-        android:fillColor="#D8E2FF"
-        android:pathData="M65.5,19.5 L81.6,35.6 L70.1,35.6 A4.6,4.6 0 0 1 65.5,31 Z" />
-    <path
-        android:fillColor="#2E5AAC"
-        android:pathData="M33.3,49.4 L67.8,49.4 L67.8,54 L33.3,54 Z M33.3,60.9 L67.8,60.9 L67.8,65.5 L33.3,65.5 Z M33.3,72.4 L56.3,72.4 L56.3,77 L33.3,77 Z" />
+    <!-- Launchers only show the middle 72x72 of this 108x108 canvas (a circle of radius 36
+         at its tightest), so the paper is centered and scaled until its farthest point sits
+         at radius 34: as large as it can be without any mask shape clipping its corners. -->
+    <group
+        android:pivotX="51.7"
+        android:pivotY="56.3"
+        android:scaleX="0.7464"
+        android:scaleY="0.7464"
+        android:translateX="2.3"
+        android:translateY="-2.3">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M26.4,19.5 L65.5,19.5 L81.6,35.6 L81.6,88.5 A4.6,4.6 0 0 1 77,93.1 L26.4,93.1 A4.6,4.6 0 0 1 21.8,88.5 L21.8,24.1 A4.6,4.6 0 0 1 26.4,19.5 Z" />
+        <path
+            android:fillColor="#D8E2FF"
+            android:pathData="M65.5,19.5 L81.6,35.6 L70.1,35.6 A4.6,4.6 0 0 1 65.5,31 Z" />
+        <path
+            android:fillColor="#2E5AAC"
+            android:pathData="M33.3,49.4 L67.8,49.4 L67.8,54 L33.3,54 Z M33.3,60.9 L67.8,60.9 L67.8,65.5 L33.3,65.5 Z M33.3,72.4 L56.3,72.4 L56.3,77 L33.3,77 Z" />
+    </group>
 </vector>

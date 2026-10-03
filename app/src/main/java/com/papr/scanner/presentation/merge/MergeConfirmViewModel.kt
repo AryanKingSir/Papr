@@ -49,11 +49,19 @@ class MergeConfirmViewModel(
         val documents = _uiState.value.documents
         val index = documents.indexOfFirst { it.id == document.id }
         if (index == -1) return
-        _uiState.value = _uiState.value.copy(documents = reordered(documents, index, direction))
+        updateDocuments(reordered(documents, index, direction))
     }
 
     fun removeDocument(document: Document) {
-        _uiState.value = _uiState.value.copy(documents = _uiState.value.documents.filter { it.id != document.id })
+        updateDocuments(_uiState.value.documents.filter { it.id != document.id })
+    }
+
+    private fun updateDocuments(documents: List<Document>) {
+        val state = _uiState.value
+        _uiState.value = state.copy(
+            documents = documents,
+            title = titleAfterListChange(state.title, state.documents.map { it.title }, documents.map { it.title }),
+        )
     }
 
     fun merge() {
@@ -82,6 +90,13 @@ internal fun defaultMergeTitle(titles: List<String>): String {
     val joined = titles.joinToString(" + ")
     return if (joined.length > MAX_DEFAULT_TITLE_LENGTH) joined.take(MAX_DEFAULT_TITLE_LENGTH).trimEnd() + "…" else joined
 }
+
+/**
+ * Keeps the default title in step with the list (order and removals) until the user
+ * types their own - an edited title is left exactly as they wrote it.
+ */
+internal fun titleAfterListChange(currentTitle: String, oldTitles: List<String>, newTitles: List<String>): String =
+    if (currentTitle == defaultMergeTitle(oldTitles)) defaultMergeTitle(newTitles) else currentTitle
 
 /** Swaps the item at [index] with its neighbor in [direction] (-1 earlier, +1 later); returns [items] unchanged if that neighbor is out of bounds. */
 internal fun <T> reordered(items: List<T>, index: Int, direction: Int): List<T> {
