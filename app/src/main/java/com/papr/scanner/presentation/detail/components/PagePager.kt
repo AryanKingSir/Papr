@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
@@ -24,6 +25,7 @@ import java.io.File
 @Composable
 fun PagePager(
     pages: List<Page>,
+    revision: Int,
     currentPageIndex: Int,
     onPageChanged: (Int) -> Unit,
     isMarkingConfidential: Boolean,
@@ -54,42 +56,47 @@ fun PagePager(
         modifier = modifier,
     ) { index ->
         val page = pages.getOrNull(index)
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-        ) {
-            PageImage(
-                file = page?.let { File(it.imageUri) },
-                contentDescription = "Page ${index + 1}",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit,
-            )
-            if (page != null) {
-                val imageSize = rememberImageSize(File(page.imageUri))
-                val isCurrent = index == currentPageIndex
-                if (imageSize != null) {
-                    // Same layering as the PDF export: signature under marks.
-                    page.signature?.let { signature ->
-                        SignatureOverlay(
-                            signature = signature,
+        // A rotate rewrites the page file in place without changing its row, so `pages`
+        // can compare equal and this page would be skipped, still showing the old image.
+        // Keying on the revision re-runs it, re-reading the file.
+        key(revision) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+            ) {
+                PageImage(
+                    file = page?.let { File(it.imageUri) },
+                    contentDescription = "Page ${index + 1}",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                )
+                if (page != null) {
+                    val imageSize = rememberImageSize(File(page.imageUri))
+                    val isCurrent = index == currentPageIndex
+                    if (imageSize != null) {
+                        // Same layering as the PDF export: signature under marks.
+                        page.signature?.let { signature ->
+                            SignatureOverlay(
+                                signature = signature,
+                                imageSize = imageSize,
+                                isPlacing = isPlacingSignature && isCurrent,
+                                onTap = { onSignatureTap(page) }.takeIf { isCurrent && !isMarkingConfidential },
+                                onPlacementChange = { x, y, width -> onSignaturePlacementChange(page, x, y, width) },
+                                onRemove = { onSignatureRemove(page) },
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                        ConfidentialMarkOverlay(
                             imageSize = imageSize,
-                            isPlacing = isPlacingSignature && isCurrent,
-                            onTap = { onSignatureTap(page) }.takeIf { isCurrent && !isMarkingConfidential },
-                            onPlacementChange = { x, y, width -> onSignaturePlacementChange(page, x, y, width) },
-                            onRemove = { onSignatureRemove(page) },
+                            marks = page.confidentialMarks,
+                            editingEnabled = isMarkingConfidential && isCurrent,
+                            onStrokeAdded = { stroke -> onMarkStrokeAdded(page, stroke) },
+                            onStrokeErased = { stroke -> onMarkStrokeErased(page, stroke) },
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
-                    ConfidentialMarkOverlay(
-                        imageSize = imageSize,
-                        marks = page.confidentialMarks,
-                        editingEnabled = isMarkingConfidential && isCurrent,
-                        onStrokeAdded = { stroke -> onMarkStrokeAdded(page, stroke) },
-                        onStrokeErased = { stroke -> onMarkStrokeErased(page, stroke) },
-                        modifier = Modifier.fillMaxSize(),
-                    )
                 }
             }
         }

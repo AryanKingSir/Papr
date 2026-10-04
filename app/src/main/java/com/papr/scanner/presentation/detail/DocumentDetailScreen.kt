@@ -186,6 +186,7 @@ fun DocumentDetailScreen(
 
             PagePager(
                 pages = uiState.pages,
+                revision = uiState.revision,
                 currentPageIndex = uiState.currentPageIndex,
                 onPageChanged = viewModel::selectPage,
                 isMarkingConfidential = uiState.isMarkingConfidential,
@@ -214,6 +215,7 @@ fun DocumentDetailScreen(
 
             PageThumbnailStrip(
                 pages = uiState.pages,
+                revision = uiState.revision,
                 currentPageIndex = uiState.currentPageIndex,
                 onPageSelected = viewModel::selectPage,
             )

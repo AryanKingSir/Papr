@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -27,6 +28,7 @@ import java.io.File
 @Composable
 fun PageThumbnailStrip(
     pages: List<Page>,
+    revision: Int,
     currentPageIndex: Int,
     onPageSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
@@ -40,46 +42,49 @@ fun PageThumbnailStrip(
             // List position, not pageIndex - the two only match while page
             // indices stay contiguous, and selection is by position.
             val isSelected = index == currentPageIndex
-            Box(
-                modifier = Modifier
-                    .width(56.dp)
-                    .height(72.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .border(
-                        BorderStroke(
-                            width = if (isSelected) 2.dp else 0.dp,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                        ),
-                        RoundedCornerShape(8.dp),
+            // Re-read in-place rewritten (rotated) page files; see PagePager.
+            key(revision) {
+                Box(
+                    modifier = Modifier
+                        .width(56.dp)
+                        .height(72.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .border(
+                            BorderStroke(
+                                width = if (isSelected) 2.dp else 0.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            ),
+                            RoundedCornerShape(8.dp),
+                        )
+                        .clickable { onPageSelected(index) },
+                ) {
+                    PageImage(
+                        file = File(page.imageUri),
+                        contentDescription = "Page ${index + 1}",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
                     )
-                    .clickable { onPageSelected(index) },
-            ) {
-                PageImage(
-                    file = File(page.imageUri),
-                    contentDescription = "Page ${index + 1}",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-                if (page.signature != null || page.confidentialMarks.isNotEmpty()) {
-                    val imageSize = rememberImageSize(File(page.imageUri))
-                    if (imageSize != null) {
-                        page.signature?.let { signature ->
-                            SignatureOverlay(
-                                signature = signature,
+                    if (page.signature != null || page.confidentialMarks.isNotEmpty()) {
+                        val imageSize = rememberImageSize(File(page.imageUri))
+                        if (imageSize != null) {
+                            page.signature?.let { signature ->
+                                SignatureOverlay(
+                                    signature = signature,
+                                    imageSize = imageSize,
+                                    isPlacing = false,
+                                    crop = true,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
+                            ConfidentialMarkOverlay(
                                 imageSize = imageSize,
-                                isPlacing = false,
+                                marks = page.confidentialMarks,
+                                editingEnabled = false,
                                 crop = true,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
-                        ConfidentialMarkOverlay(
-                            imageSize = imageSize,
-                            marks = page.confidentialMarks,
-                            editingEnabled = false,
-                            crop = true,
-                            modifier = Modifier.fillMaxSize(),
-                        )
                     }
                 }
             }
