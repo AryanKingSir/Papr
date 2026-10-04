@@ -1,6 +1,7 @@
 package com.papr.scanner.presentation.home
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -68,6 +69,8 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         viewModel.errors.collect { message -> Toast.makeText(context, message, Toast.LENGTH_LONG).show() }
     }
+    // Back ends a selection, like the Cancel button, rather than leaving the app.
+    BackHandler(enabled = uiState.isSelectionMode) { viewModel.clearSelection() }
 
     Scaffold(
         topBar = {
