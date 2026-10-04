@@ -3,6 +3,7 @@ package com.papr.scanner.presentation.detail
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -275,11 +277,16 @@ fun DocumentDetailScreen(
                     ) { pageActions() }
                 }
             } else {
+                val screenWidth = maxWidth
                 Column {
                     pageArea()
+                    // Scrolls sideways when the seven buttons don't fit (narrow phones, or the
+                    // largest display size) instead of squashing the last ones; at least
+                    // screen-wide so they still spread out evenly when they do fit.
                     Row(
                         modifier = Modifier
-                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .widthIn(min = screenWidth)
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                     ) { pageActions() }
