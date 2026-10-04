@@ -9,6 +9,7 @@ import com.papr.scanner.core.FileUtils
 import com.papr.scanner.data.repository.DocumentDeleter
 import com.papr.scanner.data.repository.DocumentRepository
 import com.papr.scanner.domain.model.ConfidentialMarkStroke
+import com.papr.scanner.domain.model.ExportFormat
 import com.papr.scanner.domain.model.Page
 import com.papr.scanner.domain.model.PageAnnotation
 import com.papr.scanner.domain.model.TextNote
@@ -19,13 +20,13 @@ import com.papr.scanner.pdf.PageImageExporter
 import com.papr.scanner.pdf.PasswordProtection
 import com.papr.scanner.pdf.PdfEngine
 import com.papr.scanner.pdf.PdfGenerationOptions
+import com.papr.scanner.pdf.TextRecognitionUnavailableException
 import com.papr.scanner.pdf.overlays
 import com.papr.scanner.presentation.detail.markup.MarkupEdit
 import com.papr.scanner.presentation.detail.markup.MarkupHistory
 import com.papr.scanner.presentation.detail.markup.MarkupSnapshot
 import com.papr.scanner.presentation.detail.markup.ToolStyle
 import com.papr.scanner.presentation.detail.markup.defaultStyle
-import com.papr.scanner.pdf.TextRecognitionUnavailableException
 import com.papr.scanner.usage.Allowance
 import com.papr.scanner.usage.MeteredFeature
 import com.papr.scanner.usage.UsageTracker

@@ -1,5 +1,6 @@
 package com.papr.scanner.presentation.detail
 
+import com.papr.scanner.domain.model.ExportFormat
 import com.papr.scanner.usage.MeteredFeature
 import org.junit.Assert.assertEquals
 import org.junit.Test

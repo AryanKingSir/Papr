@@ -1,6 +1,7 @@
 package com.papr.scanner.presentation.detail
 
 import com.papr.scanner.domain.model.Document
+import com.papr.scanner.domain.model.ExportFormat
 import com.papr.scanner.domain.model.Page
 import com.papr.scanner.presentation.detail.markup.ToolStyle
 
@@ -37,8 +38,6 @@ data class DocumentDetailUiState(
 enum class EditorMode { NONE, MARKUP, SIGN, PAGES }
 
 enum class MarkupTool { PEN, HIGHLIGHTER, TEXT, ERASER, CONFIDENTIAL }
-
-enum class ExportFormat { PDF, IMAGES }
 
 data class ExportSettings(
     val format: ExportFormat = ExportFormat.PDF,
