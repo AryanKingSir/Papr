@@ -25,6 +25,7 @@ import com.papr.scanner.pdf.SignatureStamper
 import com.papr.scanner.pdf.security.PdfEncryptor
 import com.papr.scanner.scanner.DocumentScannerManager
 import com.papr.scanner.scanner.ScanImporter
+import com.papr.scanner.usage.UsageTracker
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -94,5 +95,9 @@ class AppContainer(private val context: Context) {
 
     val billingManager: BillingManager by lazy {
         BillingManager(RealPlayBillingClient(context), userPreferencesRepository, Constants.PRO_PRODUCT_ID)
+    }
+
+    val usageTracker: UsageTracker by lazy {
+        UsageTracker(context.userPreferencesDataStore, userPreferencesRepository.isProUnlocked)
     }
 }
