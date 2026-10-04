@@ -51,34 +51,38 @@ class PdfEngine(
                     confidentialMarkRenderer.draw(canvas, marks, bitmap.width, bitmap.height)
                 }
             },
-        ) { bitmap, pageIndex, placement ->
-            if (options.ocrEnabled) {
-                // Runs on the already-marked image, so text hidden by a confidential
-                // mark is never recognized into the selectable text layer.
-                // Injected as raw PDF operators, bypassing Canvas entirely - so
-                // placement applies the page's fit transform by hand (and flips Y,
-                // since PDF space is bottom-up while OcrTextStamper's boxes are top-down).
-                ocrElementsByPage[pageIndex] = ocrTextStamper.recognize(bitmap).map { element ->
-                    element.copy(
-                        x = placement.toPdfX(element.x),
-                        y = placement.toPdfY(element.y),
-                        fontSize = placement.toPdfLength(element.fontSize),
-                        width = placement.toPdfLength(element.width),
-                    )
+            onPageDrawn = { bitmap, pageIndex, placement ->
+                if (options.ocrEnabled) {
+                    // Runs on the already-marked image, so text hidden by a confidential
+                    // mark is never recognized into the selectable text layer.
+                    // Injected as raw PDF operators, bypassing Canvas entirely - so
+                    // placement applies the page's fit transform by hand (and flips Y,
+                    // since PDF space is bottom-up while OcrTextStamper's boxes are top-down).
+                    ocrElementsByPage[pageIndex] = ocrTextStamper.recognize(bitmap).map { element ->
+                        element.copy(
+                            x = placement.toPdfX(element.x),
+                            y = placement.toPdfY(element.y),
+                            fontSize = placement.toPdfLength(element.fontSize),
+                            width = placement.toPdfLength(element.width),
+                        )
+                    }
                 }
-            }
-        }
+            },
+            finish = { pdf ->
+                // Runs on every compression attempt, before the file is measured, so the
+                // text layer and encryption count toward the target size.
+                if (options.ocrEnabled) {
+                    invisibleTextLayerInjector.inject(pdf, ocrElementsByPage)
+                }
 
-        if (options.ocrEnabled) {
-            invisibleTextLayerInjector.inject(outputFile, ocrElementsByPage)
-        }
-
-        // Must run last: encryption turns every other object's bytes into
-        // ciphertext, so any later structural edit (OCR injection, etc.)
-        // would corrupt the file.
-        options.passwordProtection?.let { protection ->
-            pdfEncryptor.encrypt(outputFile, protection.userPassword, protection.ownerPassword)
-        }
+                // Must run last: encryption turns every other object's bytes into
+                // ciphertext, so any later structural edit (OCR injection, etc.)
+                // would corrupt the file.
+                options.passwordProtection?.let { protection ->
+                    pdfEncryptor.encrypt(pdf, protection.userPassword, protection.ownerPassword)
+                }
+            },
+        )
 
         outputFile
     }

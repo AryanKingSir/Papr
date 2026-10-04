@@ -28,6 +28,9 @@ class BitmapPdfCompiler {
         // isn't part of the image (e.g. raw PDF text operators) uses placement to
         // position itself relative to the image.
         onPageDrawn: suspend (bitmap: Bitmap, pageIndex: Int, placement: PagePlacement) -> Unit = { _, _, _ -> },
+        // Post-processes each freshly written file (e.g. adds a text layer, encrypts)
+        // before its size is measured, so a target size covers the finished file.
+        finish: suspend (File) -> Unit = {},
     ): File = withContext(Dispatchers.IO) {
         // PdfDocument gives no direct control over embedded image size or
         // quality - the only lever that actually changes the written file's
@@ -40,6 +43,7 @@ class BitmapPdfCompiler {
         var scale = 1f
         for (attempt in 0 until MAX_ATTEMPTS) {
             writePdf(pageFiles, outputFile, scale, preparePage, onPageDrawn)
+            finish(outputFile)
             // Written as two direct checks (not one `val` combining them) so the
             // compiler can still smart-cast targetSizeBytes to non-null below -
             // smart-casting doesn't see through an intermediate Boolean val.
@@ -151,6 +155,12 @@ class BitmapPdfCompiler {
     }
 }
 
-/** Raster output size scales roughly with pixel area, so scaling by sqrt(target/actual) converges in a few rounds instead of a fixed-step search. */
+/**
+ * Raster output size scales roughly with pixel area, so scaling by sqrt(target/actual) converges in a few rounds instead of a fixed-step search.
+ * It aims a little under the target: part of the file (the OCR text layer, encryption, PDF structure) doesn't shrink
+ * with the images, and aiming exactly at the target would leave the file just over it every round.
+ */
 internal fun nextScale(currentScale: Float, targetBytes: Long, actualBytes: Long): Float =
-    currentScale * sqrt(targetBytes.toDouble() / actualBytes).toFloat()
+    currentScale * sqrt(TARGET_AIM * targetBytes / actualBytes).toFloat()
+
+private const val TARGET_AIM = 0.95
