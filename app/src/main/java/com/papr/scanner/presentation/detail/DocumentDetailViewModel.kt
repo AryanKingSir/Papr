@@ -17,6 +17,9 @@ import com.papr.scanner.pdf.PasswordProtection
 import com.papr.scanner.pdf.PdfEngine
 import com.papr.scanner.pdf.PdfGenerationOptions
 import com.papr.scanner.pdf.TextRecognitionUnavailableException
+import com.papr.scanner.usage.Allowance
+import com.papr.scanner.usage.MeteredFeature
+import com.papr.scanner.usage.UsageTracker
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
@@ -40,6 +43,7 @@ class DocumentDetailViewModel(
     private val documentRepository: DocumentRepository,
     private val documentDeleter: DocumentDeleter,
     private val pdfEngine: PdfEngine,
+    private val usageTracker: UsageTracker,
     private val appContext: Context,
 ) : ViewModel() {
 
@@ -86,6 +90,13 @@ class DocumentDetailViewModel(
 
     private val _errors = MutableSharedFlow<String>()
     val errors: SharedFlow<String> = _errors.asSharedFlow()
+
+    val allowances: StateFlow<Map<MeteredFeature, Allowance>> =
+        usageTracker.allowances.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /** Asks the screen to show the Pro sheet, with the reason it's being shown. */
+    private val _proSheetRequests = MutableSharedFlow<String>()
+    val proSheetRequests: SharedFlow<String> = _proSheetRequests.asSharedFlow()
 
     fun selectPage(index: Int) {
         localState.update {
@@ -255,9 +266,15 @@ class DocumentDetailViewModel(
 
     fun export(settings: ExportSettings) {
         if (localState.value.isExporting) return
+        val features = meteredFeaturesFor(settings)
         viewModelScope.launch {
             localState.update { it.copy(isExporting = true) }
             try {
+                // The sheet locks used-up options, but it may have been opened before the last use.
+                usageTracker.firstUsedUp(features)?.let { usedUp ->
+                    _proSheetRequests.emit(usedUp.limitReachedMessage)
+                    return@launch
+                }
                 val outputFile = fileMutex.withLock {
                     val document = documentRepository.getDocument(documentId) ?: return@launch
                     val pages = documentRepository.getPages(documentId)
@@ -296,6 +313,8 @@ class DocumentDetailViewModel(
                     document.pdfUri?.takeIf { it != exportFile.absolutePath }?.let { File(it).delete() }
                     exportFile
                 }
+                // Only a finished export counts against the free plan's limits.
+                usageTracker.recordUse(features)
                 _pdfReady.emit(outputFile)
             } catch (e: CancellationException) {
                 throw e
@@ -353,4 +372,11 @@ class DocumentDetailViewModel(
     private companion object {
         const val BYTES_PER_MB = 1024 * 1024
     }
+}
+
+/** The limited features an export with [settings] uses - the password only counts when one is set. */
+internal fun meteredFeaturesFor(settings: ExportSettings): Set<MeteredFeature> = buildSet {
+    if (settings.ocrEnabled) add(MeteredFeature.OCR_EXPORT)
+    if (settings.passwordEnabled && settings.password.isNotBlank()) add(MeteredFeature.PASSWORD_EXPORT)
+    if (settings.compressToTargetSize) add(MeteredFeature.COMPRESSED_EXPORT)
 }

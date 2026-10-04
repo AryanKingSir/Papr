@@ -1,5 +1,6 @@
 package com.papr.scanner.presentation.detail.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,8 +9,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -29,12 +34,16 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.papr.scanner.presentation.detail.ExportSettings
+import com.papr.scanner.usage.Allowance
+import com.papr.scanner.usage.MeteredFeature
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExportOptionsSheet(
     isExporting: Boolean,
+    allowances: Map<MeteredFeature, Allowance>,
     onExport: (ExportSettings) -> Unit,
+    onLockedOptionTap: (MeteredFeature) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState()
@@ -59,12 +68,16 @@ fun ExportOptionsSheet(
                 subtitle = "Recognize text so it can be selected and searched",
                 checked = ocrEnabled,
                 onCheckedChange = { ocrEnabled = it },
+                allowance = allowances[MeteredFeature.OCR_EXPORT],
+                onLockedTap = { onLockedOptionTap(MeteredFeature.OCR_EXPORT) },
             )
             OptionRow(
                 title = "Compress to target size",
                 subtitle = "Reduce image quality to hit a target file size",
                 checked = compressEnabled,
                 onCheckedChange = { compressEnabled = it },
+                allowance = allowances[MeteredFeature.COMPRESSED_EXPORT],
+                onLockedTap = { onLockedOptionTap(MeteredFeature.COMPRESSED_EXPORT) },
             )
             if (compressEnabled) {
                 Text("Target: ${"%.1f".format(targetSizeMb)} MB", modifier = Modifier.padding(top = 4.dp))
@@ -79,6 +92,8 @@ fun ExportOptionsSheet(
                 subtitle = "Require a password to open the PDF",
                 checked = passwordEnabled,
                 onCheckedChange = { passwordEnabled = it },
+                allowance = allowances[MeteredFeature.PASSWORD_EXPORT],
+                onLockedTap = { onLockedOptionTap(MeteredFeature.PASSWORD_EXPORT) },
             )
             if (passwordEnabled) {
                 OutlinedTextField(
@@ -124,19 +139,48 @@ private fun OptionRow(
     subtitle: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    // Null while it's unknown or unlimited (Pro): the row then shows no count.
+    allowance: Allowance?,
+    onLockedTap: () -> Unit,
 ) {
+    val remaining = allowance?.remaining
+    val locked = remaining == 0
     // The whole row toggles, not just the switch - tapping the label is the natural target.
+    // A used-up option can't be switched on; tapping it explains why instead.
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
+            .then(
+                if (locked) {
+                    Modifier.clickable(role = Role.Button, onClick = onLockedTap)
+                } else {
+                    Modifier.toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
+                }
+            )
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = androidx.compose.material3.MaterialTheme.typography.bodyLarge)
-            Text(subtitle, style = androidx.compose.material3.MaterialTheme.typography.labelLarge)
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(subtitle, style = MaterialTheme.typography.labelLarge)
+            if (remaining != null) {
+                Text(
+                    if (locked) "None left this month" else "$remaining of ${allowance.limit} left this month",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (locked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
         }
-        Switch(checked = checked, onCheckedChange = null)
+        if (locked) {
+            Icon(
+                Icons.Filled.Lock,
+                contentDescription = "Needs Papr Pro",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 12.dp),
+            )
+        } else {
+            Switch(checked = checked, onCheckedChange = null)
+        }
     }
 }

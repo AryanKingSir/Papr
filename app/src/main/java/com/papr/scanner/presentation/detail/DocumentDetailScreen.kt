@@ -67,6 +67,7 @@ import com.papr.scanner.presentation.detail.components.ExportOptionsSheet
 import com.papr.scanner.presentation.detail.components.PagePager
 import com.papr.scanner.presentation.detail.components.PageThumbnailStrip
 import com.papr.scanner.presentation.detail.components.SignatureOverlayEditor
+import com.papr.scanner.presentation.paywall.ProUpgradeSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,10 +83,12 @@ fun DocumentDetailScreen(
             container.documentRepository,
             container.documentDeleter,
             container.pdfEngine,
+            container.usageTracker,
             container.appContext,
         )
     }
     val uiState by viewModel.uiState.collectAsState()
+    val allowances by viewModel.allowances.collectAsState()
     val context = LocalContext.current
     val currentOnBack by rememberUpdatedState(onBack)
 
@@ -95,6 +98,8 @@ fun DocumentDetailScreen(
     var showSignatureEditor by remember { mutableStateOf(false) }
     var showExportOptions by remember { mutableStateOf(false) }
     var pendingDeletePage by remember { mutableStateOf(false) }
+    // Non-null while the Pro sheet is open: why it opened.
+    var paywallReason by remember { mutableStateOf<String?>(null) }
 
     // Leave exactly once, whether the document was deleted here (its last
     // page removed) or turns out not to exist - never sit on an empty screen.
@@ -119,6 +124,9 @@ fun DocumentDetailScreen(
     }
     LaunchedEffect(Unit) {
         viewModel.errors.collect { message -> Toast.makeText(context, message, Toast.LENGTH_LONG).show() }
+    }
+    LaunchedEffect(Unit) {
+        viewModel.proSheetRequests.collect { reason -> paywallReason = reason }
     }
 
     val currentPage = uiState.pages.getOrNull(uiState.currentPageIndex)
@@ -317,9 +325,15 @@ fun DocumentDetailScreen(
     if (showExportOptions) {
         ExportOptionsSheet(
             isExporting = uiState.isExporting,
+            allowances = allowances,
             onExport = viewModel::export,
+            onLockedOptionTap = { feature -> paywallReason = feature.limitReachedMessage },
             onDismiss = { showExportOptions = false },
         )
+    }
+
+    paywallReason?.let { reason ->
+        ProUpgradeSheet(onDismiss = { paywallReason = null }, reason = reason)
     }
 
     if (pendingDeletePage) {
