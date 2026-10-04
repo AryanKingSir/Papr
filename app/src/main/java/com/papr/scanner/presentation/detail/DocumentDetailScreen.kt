@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -56,6 +58,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.papr.scanner.core.FileUtils
@@ -119,6 +122,12 @@ fun DocumentDetailScreen(
     }
 
     val currentPage = uiState.pages.getOrNull(uiState.currentPageIndex)
+    val saveTitle = {
+        if (titleDraft.text.isNotBlank()) {
+            viewModel.updateTitle(titleDraft.text)
+            isEditingTitle = false
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -129,6 +138,9 @@ fun DocumentDetailScreen(
                             value = titleDraft,
                             onValueChange = { titleDraft = it },
                             singleLine = true,
+                            // The keyboard's Done key saves, like the Save button.
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = { saveTitle() }),
                             modifier = Modifier.focusRequester(titleFocus),
                         )
                     } else {
@@ -154,10 +166,7 @@ fun DocumentDetailScreen(
                 actions = {
                     if (isEditingTitle) {
                         TextButton(
-                            onClick = {
-                                viewModel.updateTitle(titleDraft.text)
-                                isEditingTitle = false
-                            },
+                            onClick = saveTitle,
                             enabled = titleDraft.text.isNotBlank(),
                         ) { Text("Save") }
                     } else {
