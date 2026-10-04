@@ -123,7 +123,27 @@ The free plan gets 5 searchable-text (OCR), 5 password and 5 compressed exports 
 1. Export sheet: each option says "N of 5 left this month". An export with compression + password uses one of each and leaves OCR alone. With none left the switch becomes a lock, and tapping the row opens the Pro sheet saying which limit was hit. ✓ emulator 2026-10-04 (debug and release)
 2. A failed export costs nothing (OCR export when text recognition isn't ready stays at 5 of 5). ✓ emulator 2026-10-04
 3. Merge screen: "N of 5 free merges left this month" drops after a merge. With none left the button reads "Go Pro to merge" and opens the Pro sheet with the reason. ✓ emulator 2026-10-04
-4. Marks on the free plan: the brush on a page without marks opens the Pro sheet. On a page with marks it enters marking mode ("Tap a mark to remove it. Adding marks needs Papr Pro."): tapping a mark removes it, and a drawn stroke is dropped and opens the Pro sheet. Existing marks are still baked into a free plain export. ✓ emulator 2026-10-04
+4. Marks on the free plan: the Confidential tool (Markup, with a lock) on a page without marks opens the Pro sheet. On a page with marks it selects the tool ("Tap a mark to remove it. Adding marks needs Papr Pro."): tapping a mark removes it, and a drawn stroke is dropped and opens the Pro sheet. Existing marks are still baked into a free plain export. ✓ emulator 2026-10-04
 5. New month: with the stored month set to last month, every count is back to 5 of 5, and the first use writes the current month. ✓ emulator 2026-10-04 (debug and release)
 6. Pro: no counts on the export sheet or merge screen, nothing is locked, uses aren't counted, and marking shows the full hint. ✓ emulator 2026-10-04 (by setting `is_pro_unlocked`)
 7. A real purchase from the Pro sheet removes the limits on the open screen right away, with no restart. Needs a Play testing track build.
+
+## 11. Editor & markup (redesign 2026-10-04)
+
+The editor's bottom bar is four labelled groups - Markup, Sign, Pages, Export - each opening its own labelled tools with Done (spec: `specs/2026-10-04-editor-markup-redesign-design.md`). Markup is free; only adding confidential marks needs Pro.
+
+1. Every button on the editor and home screen has a text label; the title shows a pencil and tapping it renames. Back steps out of a tool group before it leaves the document. ✓ emulator 2026-10-04
+2. Pen and highlighter: each of the four colours and three sizes draws as previewed; a highlighter crossing itself doesn't get darker; markup shows on the page, its thumbnail and the home card. ✓ emulator 2026-10-04
+3. Text: tap to add (dialog), tap the text to edit or delete it, drag it to move it; line breaks and accented characters survive. ✓ emulator 2026-10-04
+4. Eraser: dragging across lines, highlights, text or confidential marks removes them whole (the signature is never erased). Undo/Redo step through every change in the session, across pages; they reset when Markup is closed. ✓ emulator 2026-10-04
+5. Rotate a page with markup: the lines, text (turned with the page) and marks stay on the same content, at the same thickness. ✓ emulator 2026-10-04
+6. Export a PDF and images: markup, signature and confidential marks are baked in, confidential marks on top. A document exported before this update comes out byte-identical. ✓ emulator 2026-10-04 (debug and release)
+7. Sign: "Remember this signature" (on by default) saves it; "Use saved" puts it on another page or document at the right proportions; "Forget saved" removes it. ✓ emulator 2026-10-04
+8. Pages > Organize: hold and drag a page to reorder (the editor and thumbnail follow); Select pages to rotate or delete them together; deleting every page warns that the document goes too; tapping a page opens it. ✓ emulator 2026-10-04 (debug and release)
+9. Export > Images: every page as a JPG through the share sheet; free, even with PDF options left on. ✓ emulator 2026-10-04 (debug and release)
+10. Home: Filter button (with a count) opens date and folder filters; filters in use are removable chips; Pro button hidden for Pro owners; selecting shows labelled Delete / Merge above the navigation bar; the scan button reads "Scan". ✓ emulator 2026-10-04
+11. Merging documents with markup keeps it, and the signatures. ✓ emulator 2026-10-04 (release)
+12. Upgrading from the previous version (database v3 to v4) keeps every document, mark and signature. ✓ emulator 2026-10-04
+13. Landscape (tools on a side rail, markup options under the page) and the largest font size (tool rows scroll sideways). ✓ emulator 2026-10-04
+14. Drawing, erasing and dragging text with a finger on a real phone feel right - no lag, strokes follow the finger, a stray touch doesn't swipe pages while marking up.
+
