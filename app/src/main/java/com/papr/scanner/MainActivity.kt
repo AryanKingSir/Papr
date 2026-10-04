@@ -1,16 +1,21 @@
 package com.papr.scanner
 
+import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -19,6 +24,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.compose.rememberNavController
+import com.papr.scanner.domain.model.ThemeMode
 import com.papr.scanner.presentation.navigation.PaprNavHost
 import com.papr.scanner.presentation.navigation.Screen
 import com.papr.scanner.presentation.theme.PaprTheme
@@ -59,24 +65,46 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            PaprTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    val navController = rememberNavController()
-
-                    LaunchedEffect(navigateToDocumentId) {
-                        navigateToDocumentId?.let { id ->
-                            navController.navigate(Screen.DocumentDetail.createRoute(id))
-                            navigateToDocumentId = null
-                        }
-                    }
-
-                    PaprNavHost(
-                        navController = navController,
-                        onScanClick = { startScan(ScanTarget.NewDocument) },
-                        onAddPagesClick = { documentId -> startScan(ScanTarget.AppendPages(documentId)) },
-                        onReplacePageClick = { documentId, pageId -> startScan(ScanTarget.ReplacePage(documentId, pageId)) },
+            // Nothing until the stored theme is known (a few ms), rather than a flash of the wrong one.
+            val settings by container.userPreferencesRepository.settings.collectAsState(initial = null)
+            val appSettings = settings
+            if (appSettings != null) {
+                val darkTheme = when (appSettings.themeMode) {
+                    ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                    ThemeMode.LIGHT -> false
+                    ThemeMode.DARK -> true
+                }
+                // The status and navigation bar icons follow the app's theme, which can now differ from the phone's.
+                LaunchedEffect(darkTheme) {
+                    enableEdgeToEdge(
+                        statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTheme },
+                        navigationBarStyle = SystemBarStyle.auto(LIGHT_NAVIGATION_SCRIM, DARK_NAVIGATION_SCRIM) { darkTheme },
                     )
                 }
+                PaprContent(darkTheme, appSettings.dynamicColor)
+            }
+        }
+    }
+
+    @Composable
+    private fun PaprContent(darkTheme: Boolean, dynamicColor: Boolean) {
+        PaprTheme(darkTheme = darkTheme, dynamicColor = dynamicColor) {
+            Surface(modifier = Modifier.fillMaxSize()) {
+                val navController = rememberNavController()
+
+                LaunchedEffect(navigateToDocumentId) {
+                    navigateToDocumentId?.let { id ->
+                        navController.navigate(Screen.DocumentDetail.createRoute(id))
+                        navigateToDocumentId = null
+                    }
+                }
+
+                PaprNavHost(
+                    navController = navController,
+                    onScanClick = { startScan(ScanTarget.NewDocument) },
+                    onAddPagesClick = { documentId -> startScan(ScanTarget.AppendPages(documentId)) },
+                    onReplacePageClick = { documentId, pageId -> startScan(ScanTarget.ReplacePage(documentId, pageId)) },
+                )
             }
         }
     }
@@ -130,6 +158,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private companion object {
+        // androidx.activity's own defaults for the 3-button navigation bar's scrim.
+        val LIGHT_NAVIGATION_SCRIM = Color.argb(0xe6, 0xFF, 0xFF, 0xFF)
+        val DARK_NAVIGATION_SCRIM = Color.argb(0x80, 0x1b, 0x1b, 0x1b)
         const val KEY_SCAN_TARGET_TYPE = "pending_scan_target_type"
         const val KEY_DOCUMENT_ID = "pending_scan_document_id"
         const val KEY_PAGE_ID = "pending_scan_page_id"

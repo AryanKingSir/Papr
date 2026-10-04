@@ -16,6 +16,7 @@ import com.papr.scanner.presentation.detail.DocumentDetailScreen
 import com.papr.scanner.presentation.home.HomeScreen
 import com.papr.scanner.presentation.merge.MergeConfirmScreen
 import com.papr.scanner.presentation.paywall.ProUpgradeSheet
+import com.papr.scanner.presentation.settings.SettingsScreen
 
 @Composable
 fun PaprNavHost(
@@ -34,11 +35,15 @@ fun PaprNavHost(
                 onScanClick = onScanClick,
                 onUpgradeClick = { showPaywall = true },
                 onMergeClick = { ids -> navController.navigate(Screen.MergeConfirm.createRoute(ids)) },
+                onSettingsClick = { navController.navigate(Screen.Settings.route) },
             )
 
             if (showPaywall) {
                 ProUpgradeSheet(onDismiss = { showPaywall = false })
             }
+        }
+        composable(Screen.Settings.route) {
+            SettingsScreen(onBack = { navController.popBackStack() })
         }
         composable(
             route = Screen.DocumentDetail.route,

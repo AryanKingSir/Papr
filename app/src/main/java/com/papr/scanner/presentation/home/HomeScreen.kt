@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -73,6 +74,7 @@ fun HomeScreen(
     onScanClick: () -> Unit,
     onUpgradeClick: () -> Unit,
     onMergeClick: (documentIds: List<Long>) -> Unit,
+    onSettingsClick: () -> Unit,
 ) {
     val viewModel = paprViewModel { container ->
         HomeViewModel(container.documentRepository, container.documentDeleter, container.usageTracker.isPro)
@@ -133,6 +135,9 @@ fun HomeScreen(
                                 Icon(Icons.Outlined.WorkspacePremium, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Text("Pro", modifier = Modifier.padding(start = 6.dp))
                             }
+                        }
+                        IconButton(onClick = onSettingsClick) {
+                            Icon(Icons.Outlined.Settings, contentDescription = "Settings")
                         }
                     },
                 )
