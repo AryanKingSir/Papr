@@ -28,6 +28,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -39,6 +42,8 @@ import androidx.lifecycle.createSavedStateHandle
 import com.papr.scanner.domain.model.Document
 import com.papr.scanner.presentation.common.PageImage
 import com.papr.scanner.presentation.common.paprViewModel
+import com.papr.scanner.presentation.paywall.ProUpgradeSheet
+import com.papr.scanner.usage.MeteredFeature
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,9 +54,18 @@ fun MergeConfirmScreen(
     onMergeComplete: (documentId: Long) -> Unit,
 ) {
     val viewModel = paprViewModel { container ->
-        MergeConfirmViewModel(documentIds, createSavedStateHandle(), container.documentRepository, container.documentMerger)
+        MergeConfirmViewModel(
+            documentIds,
+            createSavedStateHandle(),
+            container.documentRepository,
+            container.documentMerger,
+            container.usageTracker,
+        )
     }
     val uiState by viewModel.uiState.collectAsState()
+    val mergeAllowance by viewModel.mergeAllowance.collectAsState()
+    // Non-null while the Pro sheet is open: why it opened.
+    var paywallReason by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
 
     LaunchedEffect(Unit) {
@@ -59,6 +73,9 @@ fun MergeConfirmScreen(
     }
     LaunchedEffect(Unit) {
         viewModel.errors.collect { message -> Toast.makeText(context, message, Toast.LENGTH_LONG).show() }
+    }
+    LaunchedEffect(Unit) {
+        viewModel.proSheetRequests.collect { reason -> paywallReason = reason }
     }
 
     Scaffold(
@@ -99,16 +116,46 @@ fun MergeConfirmScreen(
                     )
                 }
             }
-            Button(
-                onClick = viewModel::merge,
-                enabled = uiState.documents.size >= 2 && uiState.title.isNotBlank() && !uiState.isMerging,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-            ) {
-                Text(if (uiState.isMerging) "Merging…" else "Merge")
+            // Null while it's unknown or unlimited (Pro): no count is shown then.
+            val allowance = mergeAllowance
+            val mergesLeft = allowance?.remaining
+            if (allowance != null && mergesLeft != null) {
+                Text(
+                    if (mergesLeft == 0) {
+                        "No free merges left this month"
+                    } else {
+                        "$mergesLeft of ${allowance.limit} free merges left this month"
+                    },
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (mergesLeft == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                )
+            }
+            if (mergesLeft == 0) {
+                Button(
+                    onClick = { paywallReason = MeteredFeature.MERGE.limitReachedMessage },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                ) {
+                    Text("Go Pro to merge")
+                }
+            } else {
+                Button(
+                    onClick = viewModel::merge,
+                    enabled = uiState.documents.size >= 2 && uiState.title.isNotBlank() && !uiState.isMerging,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                ) {
+                    Text(if (uiState.isMerging) "Merging…" else "Merge")
+                }
             }
         }
+    }
+
+    paywallReason?.let { reason ->
+        ProUpgradeSheet(onDismiss = { paywallReason = null }, reason = reason)
     }
 }
 

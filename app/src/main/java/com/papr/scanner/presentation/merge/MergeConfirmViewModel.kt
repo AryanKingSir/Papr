@@ -7,14 +7,20 @@ import androidx.lifecycle.viewModelScope
 import com.papr.scanner.data.repository.DocumentMerger
 import com.papr.scanner.data.repository.DocumentRepository
 import com.papr.scanner.domain.model.Document
+import com.papr.scanner.usage.Allowance
+import com.papr.scanner.usage.MeteredFeature
+import com.papr.scanner.usage.UsageTracker
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class MergeConfirmViewModel(
@@ -22,6 +28,7 @@ class MergeConfirmViewModel(
     private val savedState: SavedStateHandle,
     private val documentRepository: DocumentRepository,
     private val documentMerger: DocumentMerger,
+    private val usageTracker: UsageTracker,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MergeConfirmUiState())
@@ -32,6 +39,14 @@ class MergeConfirmViewModel(
 
     private val _errors = MutableSharedFlow<String>()
     val errors: SharedFlow<String> = _errors.asSharedFlow()
+
+    val mergeAllowance: StateFlow<Allowance?> = usageTracker.allowances
+        .map { it[MeteredFeature.MERGE] }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Asks the screen to show the Pro sheet, with the reason it's being shown. */
+    private val _proSheetRequests = MutableSharedFlow<String>()
+    val proSheetRequests: SharedFlow<String> = _proSheetRequests.asSharedFlow()
 
     init {
         viewModelScope.launch {
@@ -78,7 +93,14 @@ class MergeConfirmViewModel(
         viewModelScope.launch {
             _uiState.value = state.copy(isMerging = true)
             try {
+                usageTracker.firstUsedUp(MERGE)?.let { usedUp ->
+                    _uiState.value = _uiState.value.copy(isMerging = false)
+                    _proSheetRequests.emit(usedUp.limitReachedMessage)
+                    return@launch
+                }
                 val newDocumentId = documentMerger.merge(state.documents.map { it.id }, state.title.trim())
+                // Only a finished merge counts against the free plan's limit.
+                usageTracker.recordUse(MERGE)
                 _mergeComplete.emit(newDocumentId)
             } catch (e: CancellationException) {
                 throw e
@@ -94,6 +116,7 @@ class MergeConfirmViewModel(
 private const val MAX_DEFAULT_TITLE_LENGTH = 60
 private const val KEY_ORDER = "merge_order"
 private const val KEY_TITLE = "merge_title"
+private val MERGE = setOf(MeteredFeature.MERGE)
 
 /** Builds a default merged-document title by joining the source titles, truncated with an ellipsis if the join is too long. */
 internal fun defaultMergeTitle(titles: List<String>): String {
