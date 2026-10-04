@@ -41,6 +41,10 @@ interface PageDao {
     @Update
     suspend fun update(page: PageEntity)
 
+    /** All in one transaction, so a reorder never leaves two pages sharing a pageIndex. */
+    @Update
+    suspend fun updateAll(pages: List<PageEntity>)
+
     @Delete
     suspend fun delete(page: PageEntity)
 }

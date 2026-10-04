@@ -59,40 +59,48 @@ fun PageThumbnailStrip(
                         )
                         .clickable { onPageSelected(index) },
                 ) {
-                    PageImage(
-                        file = File(page.imageUri),
-                        contentDescription = "Page ${index + 1}",
-                        contentScale = ContentScale.Crop,
+                    PageThumbnail(page = page, contentDescription = "Page ${index + 1}", modifier = Modifier.fillMaxSize())
+                }
+            }
+        }
+    }
+}
+
+/** A page's image cropped to fill [modifier]'s box, with its markup, signature and marks drawn over it. */
+@Composable
+fun PageThumbnail(page: Page, contentDescription: String, modifier: Modifier = Modifier) {
+    Box(modifier = modifier) {
+        PageImage(
+            file = File(page.imageUri),
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+        if (page.signature != null || page.confidentialMarks.isNotEmpty() || page.annotations.isNotEmpty()) {
+            val imageSize = rememberImageSize(File(page.imageUri))
+            if (imageSize != null) {
+                MarkupOverlay(
+                    imageSize = imageSize,
+                    annotations = page.annotations,
+                    crop = true,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                page.signature?.let { signature ->
+                    SignatureOverlay(
+                        signature = signature,
+                        imageSize = imageSize,
+                        isPlacing = false,
+                        crop = true,
                         modifier = Modifier.fillMaxSize(),
                     )
-                    if (page.signature != null || page.confidentialMarks.isNotEmpty() || page.annotations.isNotEmpty()) {
-                        val imageSize = rememberImageSize(File(page.imageUri))
-                        if (imageSize != null) {
-                            MarkupOverlay(
-                                imageSize = imageSize,
-                                annotations = page.annotations,
-                                crop = true,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                            page.signature?.let { signature ->
-                                SignatureOverlay(
-                                    signature = signature,
-                                    imageSize = imageSize,
-                                    isPlacing = false,
-                                    crop = true,
-                                    modifier = Modifier.fillMaxSize(),
-                                )
-                            }
-                            ConfidentialMarkOverlay(
-                                imageSize = imageSize,
-                                marks = page.confidentialMarks,
-                                editingEnabled = false,
-                                crop = true,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        }
-                    }
                 }
+                ConfidentialMarkOverlay(
+                    imageSize = imageSize,
+                    marks = page.confidentialMarks,
+                    editingEnabled = false,
+                    crop = true,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
     }

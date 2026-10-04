@@ -19,8 +19,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.NoteAdd
 import androidx.compose.material.icons.automirrored.outlined.RotateRight
 import androidx.compose.material.icons.outlined.BookmarkBorder
@@ -34,6 +32,7 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FileCopy
 import androidx.compose.material.icons.outlined.FindReplace
 import androidx.compose.material.icons.outlined.Gesture
+import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.HistoryEdu
 import androidx.compose.material.icons.outlined.IosShare
 import androidx.compose.material.icons.outlined.TextFields
@@ -78,6 +77,7 @@ import com.papr.scanner.presentation.detail.components.EraserIcon
 import com.papr.scanner.presentation.detail.components.ExportOptionsSheet
 import com.papr.scanner.presentation.detail.components.MainToolbar
 import com.papr.scanner.presentation.detail.components.MarkupOptionsRow
+import com.papr.scanner.presentation.detail.components.OrganizePagesScreen
 import com.papr.scanner.presentation.detail.components.PagePager
 import com.papr.scanner.presentation.detail.components.PageThumbnailStrip
 import com.papr.scanner.presentation.detail.components.SignatureOverlayEditor
@@ -119,6 +119,7 @@ fun DocumentDetailScreen(
     var showExportOptions by remember { mutableStateOf(false) }
     var pendingDeletePage by remember { mutableStateOf(false) }
     var textEdit by remember { mutableStateOf<TextEditRequest?>(null) }
+    var showOrganize by remember { mutableStateOf(false) }
     // Non-null while the Pro sheet is open: why it opened.
     var paywallReason by remember { mutableStateOf<String?>(null) }
 
@@ -148,6 +149,23 @@ fun DocumentDetailScreen(
     }
     LaunchedEffect(Unit) {
         viewModel.proSheetRequests.collect { reason -> paywallReason = reason }
+    }
+
+    if (showOrganize) {
+        OrganizePagesScreen(
+            pages = uiState.pages,
+            revision = uiState.revision,
+            onReorder = viewModel::reorderPages,
+            onRotate = viewModel::rotatePages,
+            onDelete = viewModel::deletePages,
+            onOpenPage = { index ->
+                viewModel.selectPage(index)
+                viewModel.closeMode()
+                showOrganize = false
+            },
+            onDone = { showOrganize = false },
+        )
+        return
     }
 
     val currentPage = uiState.currentPage
@@ -346,18 +364,7 @@ fun DocumentDetailScreen(
                 }
                 EditorMode.PAGES -> SubToolbar(vertical, onDone = viewModel::closeMode) {
                     ToolButton(Icons.AutoMirrored.Outlined.RotateRight, "Rotate", { currentPage?.let { viewModel.rotatePage(it.id) } }, enabled = hasPage)
-                    ToolButton(
-                        Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                        "Earlier",
-                        { currentPage?.let { viewModel.movePage(it.id, -1) } },
-                        enabled = hasPage && uiState.currentPageIndex > 0,
-                    )
-                    ToolButton(
-                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        "Later",
-                        { currentPage?.let { viewModel.movePage(it.id, 1) } },
-                        enabled = hasPage && uiState.currentPageIndex < uiState.pages.size - 1,
-                    )
+                    ToolButton(Icons.Outlined.GridView, "Organize", { showOrganize = true }, enabled = hasPage)
                     ToolButton(Icons.Outlined.FindReplace, "Replace", { currentPage?.let { onReplacePageClick(it.id) } }, enabled = hasPage)
                     ToolButton(Icons.AutoMirrored.Outlined.NoteAdd, "Add", onAddPagesClick, enabled = uiState.document != null)
                     ToolButton(Icons.Outlined.Delete, "Delete", { pendingDeletePage = true }, enabled = hasPage)

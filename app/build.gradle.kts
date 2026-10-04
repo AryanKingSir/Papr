@@ -62,6 +62,7 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
 
     implementation(libs.coil.compose)
+    implementation(libs.reorderable)
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)

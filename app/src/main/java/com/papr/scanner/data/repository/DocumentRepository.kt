@@ -24,6 +24,7 @@ interface DocumentRepository {
     suspend fun insertPage(page: Page): Long
     suspend fun insertPages(pages: List<Page>): List<Long>
     suspend fun updatePage(page: Page)
+    suspend fun updatePages(pages: List<Page>)
     suspend fun deletePage(page: Page)
 
     /** Stores OCR text for a page, but only if it still shows [imageUri] - see PageDao.updateExtractedText. */

@@ -168,52 +168,57 @@ class DocumentDetailViewModel(
         }
     }
 
-    fun rotatePage(pageId: Long) {
+    fun rotatePage(pageId: Long) = rotatePages(listOf(pageId))
+
+    fun rotatePages(pageIds: Collection<Long>) {
         launchEdit("Couldn't rotate the page") {
-            val page = documentRepository.getPage(pageId) ?: return@launchEdit
-            val file = File(page.imageUri)
-            FileUtils.rotateJpeg(file, 90f)
-            // Marks, markup and the signature are stored relative to the image, so they
-            // have to turn with it - otherwise a mark would end up over different
-            // content than it was hiding.
-            val rotated = page.copy(
-                confidentialMarks = page.confidentialMarks.map { it.rotatedClockwise() },
-                annotations = page.annotations.map { it.rotatedClockwise() },
-                signature = page.signature?.rotatedClockwise(newPageAspect = FileUtils.imageAspectRatio(file)),
-            )
-            if (rotated != page) documentRepository.updatePage(rotated)
-            refreshThumbnailIfFirst(rotated)
+            for (pageId in pageIds) {
+                val page = documentRepository.getPage(pageId) ?: continue
+                val file = File(page.imageUri)
+                FileUtils.rotateJpeg(file, 90f)
+                // Marks, markup and the signature are stored relative to the image, so they
+                // have to turn with it - otherwise a mark would end up over different
+                // content than it was hiding.
+                val rotated = page.copy(
+                    confidentialMarks = page.confidentialMarks.map { it.rotatedClockwise() },
+                    annotations = page.annotations.map { it.rotatedClockwise() },
+                    signature = page.signature?.rotatedClockwise(newPageAspect = FileUtils.imageAspectRatio(file)),
+                )
+                if (rotated != page) documentRepository.updatePage(rotated)
+                refreshThumbnailIfFirst(rotated)
+            }
             touchDocument()
             localState.update { it.copy(revision = it.revision + 1) }
         }
     }
 
-    fun movePage(pageId: Long, direction: Int) {
+    /** Saves a new page order (page ids, first to last), keeping the page that was on screen on screen. */
+    fun reorderPages(orderedIds: List<Long>) {
         launchEdit("Couldn't move the page") {
             val pages = documentRepository.getPages(documentId)
-            val index = pages.indexOfFirst { it.id == pageId }
-            val targetIndex = index + direction
-            if (index == -1 || targetIndex !in pages.indices) return@launchEdit
-            val page = pages[index]
-            val other = pages[targetIndex]
-            documentRepository.updatePage(page.copy(pageIndex = other.pageIndex))
-            documentRepository.updatePage(other.copy(pageIndex = page.pageIndex))
-            if (index == 0 || targetIndex == 0) {
-                documentRepository.getPages(documentId).firstOrNull()?.let { FileUtils.generateThumbnail(appContext, it) }
-            }
+            val changed = pagesInNewOrder(pages, orderedIds)
+            if (changed.isEmpty()) return@launchEdit
+            val shownId = pages.getOrNull(localState.value.currentPageIndex)?.id
+            documentRepository.updatePages(changed)
+            val reordered = documentRepository.getPages(documentId)
+            if (changed.any { it.pageIndex == 0 }) FileUtils.generateThumbnail(appContext, reordered.first())
             touchDocument()
-            // Keep the moved page on screen rather than whatever slid into its old slot.
-            localState.update { it.copy(currentPageIndex = targetIndex) }
+            val shownIndex = reordered.indexOfFirst { it.id == shownId }
+            if (shownIndex != -1) localState.update { it.copy(currentPageIndex = shownIndex) }
         }
     }
 
-    fun deletePage(pageId: Long) {
+    fun deletePage(pageId: Long) = deletePages(listOf(pageId))
+
+    fun deletePages(pageIds: Collection<Long>) {
         launchEdit("Couldn't delete the page") {
-            val page = documentRepository.getPage(pageId) ?: return@launchEdit
-            documentRepository.deletePage(page)
-            withContext(Dispatchers.IO) {
-                File(page.imageUri).delete()
-                page.signature?.let { File(it.imagePath).delete() }
+            for (pageId in pageIds) {
+                val page = documentRepository.getPage(pageId) ?: continue
+                documentRepository.deletePage(page)
+                withContext(Dispatchers.IO) {
+                    File(page.imageUri).delete()
+                    page.signature?.let { File(it.imagePath).delete() }
+                }
             }
 
             val remaining = documentRepository.getPages(documentId)
@@ -225,19 +230,14 @@ class DocumentDetailViewModel(
             // Renumber to stay contiguous/zero-based: otherwise a gap opens up
             // wherever a page was deleted, and every "pageIndex == 0" check
             // (thumbnail source) would stop matching the page displayed first.
-            val renumbered = remaining.mapIndexed { index, remainingPage ->
-                if (remainingPage.pageIndex == index) {
-                    remainingPage
-                } else {
-                    remainingPage.copy(pageIndex = index).also { documentRepository.updatePage(it) }
-                }
-            }
+            val renumbered = pagesInNewOrder(remaining, remaining.map { it.id })
+            if (renumbered.isNotEmpty()) documentRepository.updatePages(renumbered)
             documentRepository.getDocument(documentId)?.let { document ->
                 documentRepository.updateDocument(
-                    document.copy(pageCount = renumbered.size, updatedAt = System.currentTimeMillis())
+                    document.copy(pageCount = remaining.size, updatedAt = System.currentTimeMillis())
                 )
             }
-            FileUtils.generateThumbnail(appContext, renumbered.first())
+            FileUtils.generateThumbnail(appContext, documentRepository.getPages(documentId).first())
         }
     }
 
@@ -526,3 +526,17 @@ internal fun meteredFeaturesFor(settings: ExportSettings): Set<MeteredFeature> =
 }
 
 private fun Page.markupSnapshot() = MarkupSnapshot(annotations, confidentialMarks)
+
+/**
+ * The pages whose pageIndex has to change for them to read in [orderedIds]'s
+ * order, renumbered 0..n-1. Ids that aren't pages any more are skipped, and
+ * pages missing from [orderedIds] (added meanwhile) keep their order at the end.
+ */
+internal fun pagesInNewOrder(pages: List<Page>, orderedIds: List<Long>): List<Page> {
+    val byId = pages.associateBy { it.id }
+    val ordered = orderedIds.mapNotNull { byId[it] }
+    val rest = pages.sortedBy { it.pageIndex }.filter { it.id !in orderedIds }
+    return (ordered + rest).mapIndexedNotNull { index, page ->
+        page.takeIf { it.pageIndex != index }?.copy(pageIndex = index)
+    }
+}

@@ -62,6 +62,9 @@ class DocumentRepositoryImpl(
     override suspend fun updatePage(page: Page) =
         pageDao.update(page.toEntity())
 
+    override suspend fun updatePages(pages: List<Page>) =
+        pageDao.updateAll(pages.map { it.toEntity() })
+
     override suspend fun deletePage(page: Page) =
         pageDao.delete(page.toEntity())
 
