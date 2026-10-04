@@ -76,4 +76,6 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Android ships org.json, but local unit tests only see stubs of it.
+    testImplementation(libs.org.json)
 }

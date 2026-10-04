@@ -10,6 +10,7 @@ import com.papr.scanner.core.Constants
 import com.papr.scanner.data.local.datastore.UserPreferencesRepository
 import com.papr.scanner.data.local.db.MIGRATION_1_2
 import com.papr.scanner.data.local.db.MIGRATION_2_3
+import com.papr.scanner.data.local.db.MIGRATION_3_4
 import com.papr.scanner.data.local.db.PaprDatabase
 import com.papr.scanner.data.repository.DocumentDeleter
 import com.papr.scanner.data.repository.DocumentMerger
@@ -50,7 +51,7 @@ class AppContainer(private val context: Context) {
 
     private val database: PaprDatabase by lazy {
         Room.databaseBuilder(context, PaprDatabase::class.java, PaprDatabase.NAME)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .build()
     }
 

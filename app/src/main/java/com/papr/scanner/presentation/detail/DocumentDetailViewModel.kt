@@ -122,11 +122,12 @@ class DocumentDetailViewModel(
             val page = documentRepository.getPage(pageId) ?: return@launchEdit
             val file = File(page.imageUri)
             FileUtils.rotateJpeg(file, 90f)
-            // Marks and the signature are stored relative to the image, so they
+            // Marks, markup and the signature are stored relative to the image, so they
             // have to turn with it - otherwise a mark would end up over different
             // content than it was hiding.
             val rotated = page.copy(
                 confidentialMarks = page.confidentialMarks.map { it.rotatedClockwise() },
+                annotations = page.annotations.map { it.rotatedClockwise() },
                 signature = page.signature?.rotatedClockwise(newPageAspect = FileUtils.imageAspectRatio(file)),
             )
             if (rotated != page) documentRepository.updatePage(rotated)

@@ -28,4 +28,5 @@ data class PageEntity(
     val confidentialMarks: String? = null,
     @Embedded(prefix = "signature_")
     val signature: SignatureColumns? = null,
+    val annotations: String? = null,
 )

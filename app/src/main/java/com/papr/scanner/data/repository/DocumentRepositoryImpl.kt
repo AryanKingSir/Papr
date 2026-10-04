@@ -8,7 +8,9 @@ import com.papr.scanner.data.local.db.SignatureColumns
 import com.papr.scanner.domain.model.Document
 import com.papr.scanner.domain.model.Page
 import com.papr.scanner.domain.model.PageSignature
+import com.papr.scanner.domain.model.decodeAnnotations
 import com.papr.scanner.domain.model.decodeMarkStrokes
+import com.papr.scanner.domain.model.encodeAnnotations
 import com.papr.scanner.domain.model.encodeMarkStrokes
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -97,6 +99,7 @@ private fun PageEntity.toDomain() = Page(
     extractedText = extractedText,
     confidentialMarks = decodeMarkStrokes(confidentialMarks),
     signature = signature?.let { PageSignature(it.imagePath, it.x, it.y, it.width, it.aspectRatio) },
+    annotations = decodeAnnotations(annotations),
 )
 
 private fun Page.toEntity() = PageEntity(
@@ -107,4 +110,5 @@ private fun Page.toEntity() = PageEntity(
     extractedText = extractedText,
     confidentialMarks = encodeMarkStrokes(confidentialMarks).ifEmpty { null },
     signature = signature?.let { SignatureColumns(it.imagePath, it.x, it.y, it.width, it.aspectRatio) },
+    annotations = encodeAnnotations(annotations),
 )

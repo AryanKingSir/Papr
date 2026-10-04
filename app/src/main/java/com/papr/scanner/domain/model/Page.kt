@@ -8,4 +8,5 @@ data class Page(
     val extractedText: String?,
     val confidentialMarks: List<ConfidentialMarkStroke> = emptyList(),
     val signature: PageSignature? = null,
+    val annotations: List<PageAnnotation> = emptyList(),
 )
