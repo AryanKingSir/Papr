@@ -156,7 +156,8 @@ fun HomeScreen(
                 LazyVerticalGrid(
                     // Two columns on a portrait phone (down to 360dp wide), more in landscape or on tablets.
                     columns = GridCells.Adaptive(minSize = 150.dp),
-                    contentPadding = PaddingValues(16.dp),
+                    // Extra bottom room so the last row can scroll clear of the scan button.
+                    contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 88.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
