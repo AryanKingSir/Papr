@@ -41,7 +41,7 @@ class InvisibleTextLayerInjector {
         val rootRef = requireNotNull(ROOT_REGEX.find(trailer)) { "no /Root in trailer" }.groupValues[1]
         val originalSize = requireNotNull(SIZE_REGEX.find(trailer)) { "no /Size in trailer" }.groupValues[1].toInt()
         val startxref = requireNotNull(lastMatch(STARTXREF_REGEX, text)) { "no startxref" }.groupValues[1]
-        val kidsObjNums = findKidsObjectNumbers(text)
+        val pageObjNums = findPageObjectNumbers(text, rootRef)
 
         val appended = StringBuilder()
         val newObjectOffsets = linkedMapOf<Int, Long>()
@@ -66,7 +66,7 @@ class InvisibleTextLayerInjector {
 
         for ((pageIndex, elements) in encodableByPage) {
             if (elements.isEmpty()) continue
-            val pageObjNum = kidsObjNums.getOrNull(pageIndex) ?: continue
+            val pageObjNum = pageObjNums.getOrNull(pageIndex) ?: continue
             val pageBody = findObjectBody(text, pageObjNum) ?: continue
 
             val contentObjNum = nextObjNum++
@@ -85,10 +85,29 @@ class InvisibleTextLayerInjector {
 
     private fun isLatin1Encodable(text: String): Boolean = text.all { it.code in 0..255 }
 
-    private fun findKidsObjectNumbers(text: String): List<Int> {
-        val kidsMatch = KIDS_REGEX.find(text) ?: return emptyList()
-        return OBJ_REF_REGEX.findAll(kidsMatch.groupValues[1]).map { it.groupValues[1].toInt() }.toList()
+    /**
+     * Every page's object number, in page order. Skia splits the page tree into
+     * nodes of at most 8 pages, so beyond that the root's /Kids are intermediate
+     * /Pages nodes rather than pages - walk the tree instead of reading one /Kids.
+     */
+    private fun findPageObjectNumbers(text: String, rootRef: String): List<Int> {
+        val catalog = findObjectBody(text, objectNumber(rootRef)) ?: return emptyList()
+        val pagesRef = PAGES_REF_REGEX.find(catalog) ?: return emptyList()
+        val pages = mutableListOf<Int>()
+        fun walk(objNum: Int, depth: Int) {
+            val body = findObjectBody(text, objNum) ?: return
+            val kids = KIDS_REGEX.find(body)
+            if (kids == null || depth > MAX_PAGE_TREE_DEPTH) {
+                pages += objNum
+                return
+            }
+            OBJ_REF_REGEX.findAll(kids.groupValues[1]).forEach { walk(it.groupValues[1].toInt(), depth + 1) }
+        }
+        walk(pagesRef.groupValues[1].toInt(), 0)
+        return pages
     }
+
+    private fun objectNumber(ref: String): Int = ref.trim().substringBefore(' ').toInt()
 
     private fun findObjectBody(text: String, objNum: Int): String? {
         val header = "\n$objNum 0 obj\n"
@@ -143,6 +162,8 @@ class InvisibleTextLayerInjector {
         private val SIZE_REGEX = Regex("/Size\\s+(\\d+)")
         private val STARTXREF_REGEX = Regex("startxref\\s+(\\d+)")
         private val KIDS_REGEX = Regex("/Kids\\s*\\[([^]]*)]")
+        private val PAGES_REF_REGEX = Regex("/Pages\\s+(\\d+)\\s+0\\s+R")
+        private const val MAX_PAGE_TREE_DEPTH = 32
         private val OBJ_REF_REGEX = Regex("(\\d+)\\s+0\\s+R")
         private val CONTENTS_REGEX = Regex("/Contents (\\d+) 0 R")
     }

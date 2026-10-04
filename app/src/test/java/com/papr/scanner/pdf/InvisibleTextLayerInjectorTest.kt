@@ -106,6 +106,80 @@ class InvisibleTextLayerInjectorTest {
         return obj.substringAfter("stream\n").substringBefore("\nendstream")
     }
 
+    /** Skia splits the page tree into nodes of at most 8 pages; here the root has two intermediate nodes. */
+    private fun nestedTreeFixturePdf(): String = """
+        %PDF-1.4
+        1 0 obj
+        <</Type /Catalog
+        /Pages 9 0 R>>
+        endobj
+        2 0 obj
+        <</Type /Page
+        /Resources <</ProcSet [/PDF /Text]>>
+        /MediaBox [0 0 100 100]
+        /Contents 3 0 R
+        /Parent 7 0 R>>
+        endobj
+        3 0 obj
+        <</Length 1>>
+        stream
+        0
+        endstream
+        endobj
+        4 0 obj
+        <</Type /Page
+        /Resources <</ProcSet [/PDF /Text]>>
+        /MediaBox [0 0 100 100]
+        /Contents 5 0 R
+        /Parent 8 0 R>>
+        endobj
+        5 0 obj
+        <</Length 1>>
+        stream
+        1
+        endstream
+        endobj
+        7 0 obj
+        <</Type /Pages
+        /Count 1
+        /Kids [2 0 R]
+        /Parent 9 0 R>>
+        endobj
+        8 0 obj
+        <</Type /Pages
+        /Count 1
+        /Kids [4 0 R]
+        /Parent 9 0 R>>
+        endobj
+        9 0 obj
+        <</Type /Pages
+        /Count 2
+        /Kids [7 0 R 8 0 R]>>
+        endobj
+        xref
+        0 10
+        0000000000 65535 f
+        trailer
+        <</Size 10
+        /Root 1 0 R>>
+        startxref
+        600
+        %%EOF
+    """.trimIndent() + "\n"
+
+    @Test
+    fun `finds pages through a nested page tree, as Skia writes for more than 8 pages`() {
+        val file = tempFolder.newFile("nested.pdf")
+        file.writeBytes(nestedTreeFixturePdf().toByteArray(latin1))
+
+        injector.inject(file, mapOf(1 to listOf(OcrTextElement("Second", 10f, 20f, 12f, 50f))))
+
+        val result = String(file.readBytes(), latin1)
+        val secondPage = result.substring(result.lastIndexOf("\n4 0 obj\n")).substringBefore("endobj")
+        assertTrue("expected the second page (object 4) to get the text layer", Regex("/Contents \\[\\d+ 0 R 5 0 R \\d+ 0 R]").containsMatchIn(secondPage))
+        assertTrue("expected the recognized text as a Tj operand", result.contains("(Second) Tj"))
+    }
+
     @Test
     fun `leaves file untouched when no page has encodable text`() {
         val file = writeFixture()
