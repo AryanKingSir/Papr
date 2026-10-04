@@ -24,6 +24,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Signed with the local debug key so the release build can be installed and run
+            // from Android Studio. A Play upload is signed with the real upload key instead,
+            // through Build > Generate Signed Bundle, which overrides this.
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
