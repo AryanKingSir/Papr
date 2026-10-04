@@ -76,9 +76,34 @@ class InvisibleTextLayerInjectorTest {
         assertTrue("expected invisible text render mode", result.contains("3 Tr"))
         assertTrue("expected a horizontal-scale Tz operator", result.contains(" Tz"))
         assertTrue("expected the recognized text as a Tj operand", result.contains("(Hello) Tj"))
-        assertTrue("expected page 2 to be redefined with an updated /Contents array", Regex("/Contents \\[4 0 R \\d+ 0 R]").containsMatchIn(result))
+        assertTrue("expected page 2 to be redefined with an updated /Contents array", Regex("/Contents \\[\\d+ 0 R 4 0 R \\d+ 0 R]").containsMatchIn(result))
         assertTrue("expected the page's Resources to reference the new font", result.contains("/Font <</F1"))
         assertTrue("expected an incremental trailer chained via /Prev", result.contains("/Prev 300"))
+    }
+
+    @Test
+    fun `isolates the text layer from graphics state the page's own stream leaves behind`() {
+        // Skia (Android 14) opens each page stream with a y-flipping `cm` it never
+        // restores; content streams in a /Contents array share graphics state, so
+        // without a q/Q bracket the text layer would land mirrored on the page.
+        val file = writeFixture()
+
+        injector.inject(file, mapOf(0 to listOf(OcrTextElement("Hello", 10f, 20f, 12f, 50f))))
+
+        val result = String(file.readBytes(), latin1)
+        val contents = Regex("/Contents \\[(\\d+) 0 R 4 0 R (\\d+) 0 R]").find(result)
+        assertTrue("expected the original stream bracketed between two new streams", contents != null)
+        val (saveObj, textObj) = contents!!.destructured
+        assertEquals("q", streamBody(result, saveObj.toInt()).trim())
+        assertTrue(
+            "expected the text layer to restore the graphics state before drawing",
+            streamBody(result, textObj.toInt()).trimStart().startsWith("Q\nBT"),
+        )
+    }
+
+    private fun streamBody(pdf: String, objNum: Int): String {
+        val obj = pdf.substring(pdf.lastIndexOf("\n$objNum 0 obj\n"))
+        return obj.substringAfter("stream\n").substringBefore("\nendstream")
     }
 
     @Test

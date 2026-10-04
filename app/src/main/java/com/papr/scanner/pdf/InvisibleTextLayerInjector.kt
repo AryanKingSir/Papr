@@ -57,6 +57,13 @@ class InvisibleTextLayerInjector {
         val fontObjNum = nextObjNum++
         appendObject(fontObjNum, "<</Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding>>")
 
+        // The streams in a /Contents array share graphics state, and Skia opens each
+        // page stream with a y-flipping `cm` it never restores (seen on Android 14) -
+        // so the page's own stream is bracketed in q ... Q, or the text layer would
+        // inherit the flip and land mirrored on the page.
+        val saveStateObjNum = nextObjNum++
+        appendObject(saveStateObjNum, "<</Length 1>>\nstream\nq\nendstream")
+
         for ((pageIndex, elements) in encodableByPage) {
             if (elements.isEmpty()) continue
             val pageObjNum = kidsObjNums.getOrNull(pageIndex) ?: continue
@@ -65,7 +72,7 @@ class InvisibleTextLayerInjector {
             val contentObjNum = nextObjNum++
             val stream = buildContentStream(elements)
             appendObject(contentObjNum, "<</Length ${stream.toByteArray(latin1).size}>>\nstream\n$stream\nendstream")
-            appendObject(pageObjNum, rewritePageBody(pageBody, fontObjNum, contentObjNum))
+            appendObject(pageObjNum, rewritePageBody(pageBody, fontObjNum, saveStateObjNum, contentObjNum))
         }
 
         val newSize = maxOf(originalSize, nextObjNum)
@@ -93,15 +100,16 @@ class InvisibleTextLayerInjector {
         return text.substring(bodyStart, end)
     }
 
-    private fun rewritePageBody(body: String, fontObjNum: Int, contentObjNum: Int): String {
+    private fun rewritePageBody(body: String, fontObjNum: Int, saveStateObjNum: Int, contentObjNum: Int): String {
         val withFont = body.replaceFirst("/Resources <<", "/Resources <</Font <</F1 $fontObjNum 0 R>>")
         return CONTENTS_REGEX.replace(withFont) { match ->
-            "/Contents [${match.groupValues[1]} 0 R $contentObjNum 0 R]"
+            "/Contents [$saveStateObjNum 0 R ${match.groupValues[1]} 0 R $contentObjNum 0 R]"
         }
     }
 
     private fun buildContentStream(elements: List<OcrTextElement>): String {
-        val builder = StringBuilder()
+        // Restores the state saved before the page's own stream (see inject).
+        val builder = StringBuilder("Q\n")
         for (element in elements) {
             val horizontalScale = horizontalScalePercent(element.text, element.fontSize, element.width)
             builder.append("BT\n3 Tr\n")
