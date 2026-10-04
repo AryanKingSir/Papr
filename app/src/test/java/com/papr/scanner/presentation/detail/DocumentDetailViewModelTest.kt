@@ -36,4 +36,16 @@ class DocumentDetailViewModelTest {
         val settings = ExportSettings(passwordEnabled = false, password = "secret")
         assertEquals(emptySet<MeteredFeature>(), meteredFeaturesFor(settings))
     }
+
+    @Test
+    fun `an image export uses no limited features, even with PDF options left on`() {
+        val settings = ExportSettings(
+            format = ExportFormat.IMAGES,
+            ocrEnabled = true,
+            compressToTargetSize = true,
+            passwordEnabled = true,
+            password = "secret",
+        )
+        assertEquals(emptySet<MeteredFeature>(), meteredFeaturesFor(settings))
+    }
 }

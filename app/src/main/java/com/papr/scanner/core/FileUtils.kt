@@ -113,14 +113,20 @@ object FileUtils {
         bounds.outWidth / bounds.outHeight.toFloat()
     }
 
-    /** Decodes a bitmap capped at [maxDimension] on its longest side, to bound memory for a one-off read (e.g. OCR). */
-    suspend fun decodeDownsampled(file: File, maxDimension: Int): Bitmap = withContext(Dispatchers.IO) {
+    /**
+     * Decodes a bitmap capped at [maxDimension] on its longest side, to bound memory for a one-off read (e.g. OCR).
+     * [mutable] for drawing onto the result (Canvas rejects the immutable bitmaps decoded by default).
+     */
+    suspend fun decodeDownsampled(file: File, maxDimension: Int, mutable: Boolean = false): Bitmap = withContext(Dispatchers.IO) {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.absolutePath, bounds)
         val sampleSize = sampleSizeFor(maxOf(bounds.outWidth, bounds.outHeight), maxDimension)
         BitmapFactory.decodeFile(
             file.absolutePath,
-            BitmapFactory.Options().apply { inSampleSize = sampleSize },
+            BitmapFactory.Options().apply {
+                inSampleSize = sampleSize
+                inMutable = mutable
+            },
         ) ?: throw IOException("Failed to decode bitmap: ${file.absolutePath}")
     }
 }

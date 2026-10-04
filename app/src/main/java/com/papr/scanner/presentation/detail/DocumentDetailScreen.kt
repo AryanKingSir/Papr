@@ -102,6 +102,7 @@ fun DocumentDetailScreen(
             container.documentRepository,
             container.documentDeleter,
             container.pdfEngine,
+            container.pageImageExporter,
             container.usageTracker,
             container.appContext,
         )
@@ -142,6 +143,21 @@ fun DocumentDetailScreen(
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             context.startActivity(Intent.createChooser(shareIntent, "Share PDF"))
+        }
+    }
+    LaunchedEffect(Unit) {
+        viewModel.imagesReady.collect { files ->
+            showExportOptions = false
+            val uris = files.map { FileUtils.getShareableUri(context, it) }
+            val shareIntent = if (uris.size == 1) {
+                Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, uris.single())
+            } else {
+                Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+            }.apply {
+                type = "image/jpeg"
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(shareIntent, if (uris.size == 1) "Share image" else "Share images"))
         }
     }
     LaunchedEffect(Unit) {

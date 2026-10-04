@@ -15,6 +15,7 @@ import com.papr.scanner.domain.model.TextNote
 import com.papr.scanner.domain.model.clampedTo
 import com.papr.scanner.domain.model.defaultSignaturePlacement
 import com.papr.scanner.domain.model.rotatedClockwise
+import com.papr.scanner.pdf.PageImageExporter
 import com.papr.scanner.pdf.PasswordProtection
 import com.papr.scanner.pdf.PdfEngine
 import com.papr.scanner.pdf.PdfGenerationOptions
@@ -52,6 +53,7 @@ class DocumentDetailViewModel(
     private val documentRepository: DocumentRepository,
     private val documentDeleter: DocumentDeleter,
     private val pdfEngine: PdfEngine,
+    private val pageImageExporter: PageImageExporter,
     private val usageTracker: UsageTracker,
     private val appContext: Context,
 ) : ViewModel() {
@@ -107,6 +109,9 @@ class DocumentDetailViewModel(
 
     private val _pdfReady = MutableSharedFlow<File>()
     val pdfReady: SharedFlow<File> = _pdfReady.asSharedFlow()
+
+    private val _imagesReady = MutableSharedFlow<List<File>>()
+    val imagesReady: SharedFlow<List<File>> = _imagesReady.asSharedFlow()
 
     private val _errors = MutableSharedFlow<String>()
     val errors: SharedFlow<String> = _errors.asSharedFlow()
@@ -386,6 +391,10 @@ class DocumentDetailViewModel(
 
     fun export(settings: ExportSettings) {
         if (localState.value.isExporting) return
+        if (settings.format == ExportFormat.IMAGES) {
+            exportImages()
+            return
+        }
         val features = meteredFeaturesFor(settings)
         viewModelScope.launch {
             localState.update { it.copy(isExporting = true) }
@@ -443,6 +452,35 @@ class DocumentDetailViewModel(
                 )
             } catch (e: Exception) {
                 Log.e("Papr", "Export failed", e)
+                _errors.emit("Export failed. Please try again.")
+            } finally {
+                localState.update { it.copy(isExporting = false) }
+            }
+        }
+    }
+
+    /** Every page as a JPG with everything drawn in. Free: it uses none of the limited PDF options. */
+    private fun exportImages() {
+        viewModelScope.launch {
+            localState.update { it.copy(isExporting = true) }
+            try {
+                val images = fileMutex.withLock {
+                    val document = documentRepository.getDocument(documentId) ?: return@launch
+                    val pages = documentRepository.getPages(documentId)
+                    if (pages.isEmpty()) return@launch
+                    pageImageExporter.export(
+                        pages.map { File(it.imageUri) to it.overlays() },
+                        // Inside the document's folder: shareable through the FileProvider, and
+                        // deleted along with the document.
+                        File(FileUtils.documentDir(appContext, documentId), "images"),
+                        FileUtils.sanitizeFileName(document.title),
+                    )
+                }
+                _imagesReady.emit(images)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("Papr", "Image export failed", e)
                 _errors.emit("Export failed. Please try again.")
             } finally {
                 localState.update { it.copy(isExporting = false) }
@@ -518,8 +556,9 @@ class DocumentDetailViewModel(
     }
 }
 
-/** The limited features an export with [settings] uses - the password only counts when one is set. */
+/** The limited features an export with [settings] uses - the password only counts when one is set, and images use none. */
 internal fun meteredFeaturesFor(settings: ExportSettings): Set<MeteredFeature> = buildSet {
+    if (settings.format == ExportFormat.IMAGES) return@buildSet
     if (settings.ocrEnabled) add(MeteredFeature.OCR_EXPORT)
     if (settings.passwordEnabled && settings.password.isNotBlank()) add(MeteredFeature.PASSWORD_EXPORT)
     if (settings.compressToTargetSize) add(MeteredFeature.COMPRESSED_EXPORT)

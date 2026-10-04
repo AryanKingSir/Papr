@@ -17,6 +17,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -33,6 +36,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.papr.scanner.presentation.detail.ExportFormat
 import com.papr.scanner.presentation.detail.ExportSettings
 import com.papr.scanner.usage.Allowance
 import com.papr.scanner.usage.MeteredFeature
@@ -47,6 +51,7 @@ fun ExportOptionsSheet(
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState()
+    var format by remember { mutableStateOf(ExportFormat.PDF) }
     var ocrEnabled by remember { mutableStateOf(false) }
     var compressEnabled by remember { mutableStateOf(false) }
     var targetSizeMb by remember { mutableFloatStateOf(1f) }
@@ -63,56 +68,80 @@ fun ExportOptionsSheet(
         ) {
             Text("Export options", style = androidx.compose.material3.MaterialTheme.typography.titleLarge)
 
-            OptionRow(
-                title = "Searchable text (OCR)",
-                subtitle = "Recognize text so it can be selected and searched",
-                checked = ocrEnabled,
-                onCheckedChange = { ocrEnabled = it },
-                allowance = allowances[MeteredFeature.OCR_EXPORT],
-                onLockedTap = { onLockedOptionTap(MeteredFeature.OCR_EXPORT) },
-            )
-            OptionRow(
-                title = "Compress to target size",
-                subtitle = "Reduce image quality to hit a target file size",
-                checked = compressEnabled,
-                onCheckedChange = { compressEnabled = it },
-                allowance = allowances[MeteredFeature.COMPRESSED_EXPORT],
-                onLockedTap = { onLockedOptionTap(MeteredFeature.COMPRESSED_EXPORT) },
-            )
-            if (compressEnabled) {
-                Text("Target: ${"%.1f".format(targetSizeMb)} MB", modifier = Modifier.padding(top = 4.dp))
-                Slider(
-                    value = targetSizeMb,
-                    onValueChange = { targetSizeMb = it },
-                    valueRange = 0.2f..10f,
-                )
+            SingleChoiceSegmentedButtonRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp, bottom = 4.dp),
+            ) {
+                ExportFormat.entries.forEachIndexed { index, option ->
+                    SegmentedButton(
+                        selected = format == option,
+                        onClick = { format = option },
+                        shape = SegmentedButtonDefaults.itemShape(index, ExportFormat.entries.size),
+                    ) { Text(if (option == ExportFormat.PDF) "PDF" else "Images") }
+                }
             }
-            OptionRow(
-                title = "Password protect",
-                subtitle = "Require a password to open the PDF",
-                checked = passwordEnabled,
-                onCheckedChange = { passwordEnabled = it },
-                allowance = allowances[MeteredFeature.PASSWORD_EXPORT],
-                onLockedTap = { onLockedOptionTap(MeteredFeature.PASSWORD_EXPORT) },
-            )
-            if (passwordEnabled) {
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("Password") },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp, bottom = 8.dp),
+
+            if (format == ExportFormat.IMAGES) {
+                Text(
+                    "Each page as a JPG image, with its markup, signature and confidential marks.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 8.dp),
                 )
+            } else {
+                OptionRow(
+                    title = "Searchable text (OCR)",
+                    subtitle = "Recognize text so it can be selected and searched",
+                    checked = ocrEnabled,
+                    onCheckedChange = { ocrEnabled = it },
+                    allowance = allowances[MeteredFeature.OCR_EXPORT],
+                    onLockedTap = { onLockedOptionTap(MeteredFeature.OCR_EXPORT) },
+                )
+                OptionRow(
+                    title = "Compress to target size",
+                    subtitle = "Reduce image quality to hit a target file size",
+                    checked = compressEnabled,
+                    onCheckedChange = { compressEnabled = it },
+                    allowance = allowances[MeteredFeature.COMPRESSED_EXPORT],
+                    onLockedTap = { onLockedOptionTap(MeteredFeature.COMPRESSED_EXPORT) },
+                )
+                if (compressEnabled) {
+                    Text("Target: ${"%.1f".format(targetSizeMb)} MB", modifier = Modifier.padding(top = 4.dp))
+                    Slider(
+                        value = targetSizeMb,
+                        onValueChange = { targetSizeMb = it },
+                        valueRange = 0.2f..10f,
+                    )
+                }
+                OptionRow(
+                    title = "Password protect",
+                    subtitle = "Require a password to open the PDF",
+                    checked = passwordEnabled,
+                    onCheckedChange = { passwordEnabled = it },
+                    allowance = allowances[MeteredFeature.PASSWORD_EXPORT],
+                    onLockedTap = { onLockedOptionTap(MeteredFeature.PASSWORD_EXPORT) },
+                )
+                if (passwordEnabled) {
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = { Text("Password") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp, bottom = 8.dp),
+                    )
+                }
             }
 
             Button(
                 onClick = {
                     onExport(
                         ExportSettings(
+                            format = format,
                             ocrEnabled = ocrEnabled,
                             compressToTargetSize = compressEnabled,
                             targetSizeMb = targetSizeMb,
@@ -122,12 +151,18 @@ fun ExportOptionsSheet(
                     )
                 },
                 // Disabled mid-export so a second tap can't queue a duplicate export.
-                enabled = !isExporting && (!passwordEnabled || password.isNotBlank()),
+                enabled = !isExporting && (format == ExportFormat.IMAGES || !passwordEnabled || password.isNotBlank()),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 12.dp, bottom = 24.dp),
             ) {
-                Text(if (isExporting) "Exporting…" else "Export")
+                Text(
+                    when {
+                        isExporting -> "Exporting…"
+                        format == ExportFormat.IMAGES -> "Share images"
+                        else -> "Export"
+                    }
+                )
             }
         }
     }

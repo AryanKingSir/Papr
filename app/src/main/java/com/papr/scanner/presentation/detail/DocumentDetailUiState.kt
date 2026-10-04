@@ -38,7 +38,10 @@ enum class EditorMode { NONE, MARKUP, SIGN, PAGES }
 
 enum class MarkupTool { PEN, HIGHLIGHTER, TEXT, ERASER, CONFIDENTIAL }
 
+enum class ExportFormat { PDF, IMAGES }
+
 data class ExportSettings(
+    val format: ExportFormat = ExportFormat.PDF,
     val ocrEnabled: Boolean = false,
     val compressToTargetSize: Boolean = false,
     val targetSizeMb: Float = 1f,
