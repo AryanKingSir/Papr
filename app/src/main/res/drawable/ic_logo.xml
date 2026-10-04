@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app icon as it looks on the home screen, for use inside the app: the
+     launcher icon's visible middle 72x72 (of its 108x108 canvas), as a rounded
+     Papr-blue tile. Fixed colours - it's the brand mark, so it doesn't follow the theme. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="28dp"
+    android:height="28dp"
+    android:viewportWidth="72"
+    android:viewportHeight="72">
+    <path
+        android:fillColor="#2E5AAC"
+        android:pathData="M16,0 L56,0 A16,16 0 0 1 72,16 L72,56 A16,16 0 0 1 56,72 L16,72 A16,16 0 0 1 0,56 L0,16 A16,16 0 0 1 16,0 Z" />
+    <group
+        android:translateX="-18"
+        android:translateY="-18">
+        <!-- Same geometry as ic_launcher_foreground.xml. -->
+        <group
+            android:pivotX="51.7"
+            android:pivotY="56.3"
+            android:scaleX="0.7464"
+            android:scaleY="0.7464"
+            android:translateX="2.3"
+            android:translateY="-2.3">
+            <path
+                android:fillColor="#FFFFFF"
+                android:pathData="M26.4,19.5 L65.5,19.5 L81.6,35.6 L81.6,88.5 A4.6,4.6 0 0 1 77,93.1 L26.4,93.1 A4.6,4.6 0 0 1 21.8,88.5 L21.8,24.1 A4.6,4.6 0 0 1 26.4,19.5 Z" />
+            <path
+                android:fillColor="#D8E2FF"
+                android:pathData="M65.5,19.5 L81.6,35.6 L70.1,35.6 A4.6,4.6 0 0 1 65.5,31 Z" />
+            <path
+                android:fillColor="#2E5AAC"
+                android:pathData="M33.3,49.4 L67.8,49.4 L67.8,54 L33.3,54 Z M33.3,60.9 L67.8,60.9 L67.8,65.5 L33.3,65.5 Z M33.3,72.4 L56.3,72.4 L56.3,77 L33.3,77 Z" />
+        </group>
+    </group>
+</vector>
