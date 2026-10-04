@@ -291,6 +291,9 @@ class DocumentDetailViewModel(
                     documentRepository.updateDocument(
                         document.copy(pdfUri = exportFile.absolutePath, updatedAt = System.currentTimeMillis())
                     )
+                    // The file is named after the title, so after a rename the previous
+                    // export would otherwise stay behind in the document's folder for good.
+                    document.pdfUri?.takeIf { it != exportFile.absolutePath }?.let { File(it).delete() }
                     exportFile
                 }
                 _pdfReady.emit(outputFile)
