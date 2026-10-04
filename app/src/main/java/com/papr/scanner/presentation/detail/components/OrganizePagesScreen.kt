@@ -50,6 +50,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.papr.scanner.domain.model.Page
+import com.papr.scanner.presentation.common.MainToolbar
+import com.papr.scanner.presentation.common.ToolButton
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyGridState
 

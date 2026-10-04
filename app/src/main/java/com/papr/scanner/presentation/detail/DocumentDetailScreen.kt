@@ -72,10 +72,11 @@ import com.papr.scanner.core.FileUtils
 import com.papr.scanner.domain.model.NormalizedPoint
 import com.papr.scanner.domain.model.Page
 import com.papr.scanner.domain.model.TextNote
+import com.papr.scanner.presentation.common.MainToolbar
+import com.papr.scanner.presentation.common.ToolButton
 import com.papr.scanner.presentation.common.paprViewModel
 import com.papr.scanner.presentation.detail.components.EraserIcon
 import com.papr.scanner.presentation.detail.components.ExportOptionsSheet
-import com.papr.scanner.presentation.detail.components.MainToolbar
 import com.papr.scanner.presentation.detail.components.MarkupOptionsRow
 import com.papr.scanner.presentation.detail.components.OrganizePagesScreen
 import com.papr.scanner.presentation.detail.components.PagePager
@@ -83,7 +84,6 @@ import com.papr.scanner.presentation.detail.components.PageThumbnailStrip
 import com.papr.scanner.presentation.detail.components.SignatureOverlayEditor
 import com.papr.scanner.presentation.detail.components.SubToolbar
 import com.papr.scanner.presentation.detail.components.TextNoteDialog
-import com.papr.scanner.presentation.detail.components.ToolButton
 import com.papr.scanner.presentation.detail.markup.defaultStyle
 import com.papr.scanner.presentation.detail.markup.sizeFraction
 import com.papr.scanner.presentation.paywall.ProUpgradeSheet

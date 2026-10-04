@@ -26,7 +26,11 @@ import kotlinx.coroutines.launch
 class HomeViewModel(
     private val documentRepository: DocumentRepository,
     private val documentDeleter: DocumentDeleter,
+    isProFlow: Flow<Boolean>,
 ) : ViewModel() {
+
+    /** Pro owners don't need the "Pro" button in the top bar. */
+    val isPro: StateFlow<Boolean> = isProFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     private val searchQuery = MutableStateFlow("")
     private val selectedFolder = MutableStateFlow<String?>(null)

@@ -1,14 +1,19 @@
 package com.papr.scanner.presentation.home.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -42,37 +47,31 @@ fun DocumentGridItem(
     // Remembered per composition rather than a top-level val, so it picks up the
     // current locale instead of whichever one was active when the class loaded.
     val dateFormat = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
-    Column(
+    val shape = RoundedCornerShape(16.dp)
+    Card(
+        shape = shape,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        border = BorderStroke(
+            width = if (isSelected) 2.dp else 1.dp,
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+        ),
         modifier = modifier
             .fillMaxWidth()
+            .clip(shape)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(0.75f)
-                .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
             PageImage(
                 file = document.thumbnailUri.takeIf { it.isNotBlank() }?.let { File(it) },
                 contentDescription = document.title,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(6.dp),
-                shape = RoundedCornerShape(6.dp),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-            ) {
-                Text(
-                    text = if (document.pageCount == 1) "1 Page" else "${document.pageCount} Pages",
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                )
-            }
             if (isContentMatch) {
                 Surface(
                     modifier = Modifier
@@ -101,18 +100,30 @@ fun DocumentGridItem(
                 }
             }
         }
-        Text(
-            text = document.title,
-            style = MaterialTheme.typography.bodyLarge,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-        // The scan date - the same date the date-range filter matches on.
-        Text(
-            text = dateFormat.format(Date(document.createdAt)),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Column(modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 12.dp)) {
+            Text(
+                text = document.title,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Row(modifier = Modifier.padding(top = 2.dp)) {
+                // The scan date - the same date the date-range filter matches on.
+                Text(
+                    text = dateFormat.format(Date(document.createdAt)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = if (document.pageCount == 1) "1 page" else "${document.pageCount} pages",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+        }
     }
 }
