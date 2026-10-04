@@ -68,6 +68,7 @@ class DocumentDetailViewModel(
             .associateWith { it.defaultStyle() },
         val canUndo: Boolean = false,
         val canRedo: Boolean = false,
+        val hasSavedSignature: Boolean = false,
     )
 
     private val localState = MutableStateFlow(LocalState())
@@ -100,6 +101,7 @@ class DocumentDetailViewModel(
             toolStyles = local.toolStyles,
             canUndo = local.canUndo,
             canRedo = local.canRedo,
+            hasSavedSignature = local.hasSavedSignature,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DocumentDetailUiState())
 
@@ -117,6 +119,13 @@ class DocumentDetailViewModel(
     /** Asks the screen to show the Pro sheet, with the reason it's being shown. */
     private val _proSheetRequests = MutableSharedFlow<String>()
     val proSheetRequests: SharedFlow<String> = _proSheetRequests.asSharedFlow()
+
+    init {
+        viewModelScope.launch {
+            val saved = withContext(Dispatchers.IO) { FileUtils.savedSignatureFile(appContext).exists() }
+            localState.update { it.copy(hasSavedSignature = saved) }
+        }
+    }
 
     fun selectPage(index: Int) {
         localState.update { it.copy(currentPageIndex = index) }
@@ -291,31 +300,63 @@ class DocumentDetailViewModel(
         publishHistory()
     }
 
-    /** Saves a freshly drawn signature onto the page (replacing any existing one), ready to place in Sign mode. */
-    fun setSignature(pageId: Long, signatureBitmap: Bitmap) {
+    /**
+     * Saves a freshly drawn signature onto the page (replacing any existing one),
+     * ready to place in Sign mode - and, when [remember] is set, keeps it as the
+     * saved signature for next time.
+     */
+    fun setSignature(pageId: Long, signatureBitmap: Bitmap, remember: Boolean) {
         launchEdit("Couldn't add the signature") {
             try {
                 val page = documentRepository.getPage(pageId) ?: return@launchEdit
-                val file = File(FileUtils.documentDir(appContext, documentId), "signature_${UUID.randomUUID()}.png")
+                val file = newSignatureFile()
                 withContext(Dispatchers.IO) {
                     // PNG keeps the transparent background, so only the ink covers the page.
                     file.outputStream().use { signatureBitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                    if (remember) file.copyTo(FileUtils.savedSignatureFile(appContext), overwrite = true)
                 }
-                val signature = defaultSignaturePlacement(
-                    imagePath = file.absolutePath,
-                    aspectRatio = signatureBitmap.height / signatureBitmap.width.toFloat(),
-                    pageAspect = FileUtils.imageAspectRatio(File(page.imageUri)),
-                )
-                val updated = page.copy(signature = signature)
-                documentRepository.updatePage(updated)
-                page.signature?.let { old -> withContext(Dispatchers.IO) { File(old.imagePath).delete() } }
-                refreshThumbnailIfFirst(updated)
-                touchDocument()
-                localState.update { it.copy(mode = EditorMode.SIGN) }
+                placeSignature(page, file, aspectRatio = signatureBitmap.height / signatureBitmap.width.toFloat())
+                if (remember) localState.update { it.copy(hasSavedSignature = true) }
             } finally {
                 signatureBitmap.recycle()
             }
         }
+    }
+
+    /** Puts a copy of the saved signature on the page - a copy, so the document folder stays self-contained. */
+    fun useSavedSignature(pageId: Long) {
+        launchEdit("Couldn't add the saved signature") {
+            val page = documentRepository.getPage(pageId) ?: return@launchEdit
+            val saved = FileUtils.savedSignatureFile(appContext)
+            val file = newSignatureFile()
+            withContext(Dispatchers.IO) { saved.copyTo(file) }
+            // A signature's aspect ratio is height over width; the image helper gives width over height.
+            placeSignature(page, file, aspectRatio = 1f / FileUtils.imageAspectRatio(file))
+        }
+    }
+
+    fun forgetSavedSignature() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { FileUtils.savedSignatureFile(appContext).delete() }
+            localState.update { it.copy(hasSavedSignature = false) }
+        }
+    }
+
+    private fun newSignatureFile() = File(FileUtils.documentDir(appContext, documentId), "signature_${UUID.randomUUID()}.png")
+
+    /** Must run inside [launchEdit]: replaces [page]'s signature with [file], at the default spot. */
+    private suspend fun placeSignature(page: Page, file: File, aspectRatio: Float) {
+        val signature = defaultSignaturePlacement(
+            imagePath = file.absolutePath,
+            aspectRatio = aspectRatio,
+            pageAspect = FileUtils.imageAspectRatio(File(page.imageUri)),
+        )
+        val updated = page.copy(signature = signature)
+        documentRepository.updatePage(updated)
+        page.signature?.let { old -> withContext(Dispatchers.IO) { File(old.imagePath).delete() } }
+        refreshThumbnailIfFirst(updated)
+        touchDocument()
+        localState.update { it.copy(mode = EditorMode.SIGN) }
     }
 
     fun updateSignaturePlacement(pageId: Long, x: Float, y: Float, width: Float) {

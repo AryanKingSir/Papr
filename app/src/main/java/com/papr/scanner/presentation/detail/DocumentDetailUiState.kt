@@ -24,6 +24,7 @@ data class DocumentDetailUiState(
     val toolStyles: Map<MarkupTool, ToolStyle> = emptyMap(),
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
+    val hasSavedSignature: Boolean = false,
 ) {
     val currentPage: Page? get() = pages.getOrNull(currentPageIndex)
     val isMarkingConfidential: Boolean get() = mode == EditorMode.MARKUP && markupTool == MarkupTool.CONFIDENTIAL

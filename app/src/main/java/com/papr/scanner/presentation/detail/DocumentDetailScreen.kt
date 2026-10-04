@@ -23,6 +23,8 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.NoteAdd
 import androidx.compose.material.icons.automirrored.outlined.RotateRight
+import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.BookmarkRemove
 import androidx.compose.material.icons.outlined.BorderColor
 import androidx.compose.material.icons.outlined.Brush
 import androidx.compose.material.icons.outlined.Create
@@ -264,7 +266,9 @@ fun DocumentDetailScreen(
 
             when {
                 uiState.isPlacingSignature -> HintRow("Drag the signature to move it. Drag its corner to resize.")
-                uiState.mode == EditorMode.SIGN -> HintRow("Draw your signature, then drag it into place.")
+                uiState.mode == EditorMode.SIGN -> HintRow(
+                    if (uiState.hasSavedSignature) "Use your saved signature, or draw a new one." else "Draw your signature, then drag it into place."
+                )
                 inMarkup && uiState.markupTool == MarkupTool.TEXT ->
                     HintRow("Tap to add text. Tap text to edit it, drag to move it.")
             }
@@ -326,6 +330,9 @@ fun DocumentDetailScreen(
                     )
                 }
                 EditorMode.SIGN -> SubToolbar(vertical, onDone = viewModel::closeMode) {
+                    if (uiState.hasSavedSignature) {
+                        ToolButton(Icons.Outlined.BookmarkBorder, "Use saved", { currentPage?.let { viewModel.useSavedSignature(it.id) } }, enabled = hasPage)
+                    }
                     ToolButton(Icons.Outlined.Draw, "Draw new", { showSignatureEditor = true }, enabled = hasPage)
                     ToolButton(
                         Icons.Outlined.Delete,
@@ -333,6 +340,9 @@ fun DocumentDetailScreen(
                         { currentPage?.let { viewModel.removeSignature(it.id) } },
                         enabled = currentPage?.signature != null,
                     )
+                    if (uiState.hasSavedSignature) {
+                        ToolButton(Icons.Outlined.BookmarkRemove, "Forget saved", viewModel::forgetSavedSignature)
+                    }
                 }
                 EditorMode.PAGES -> SubToolbar(vertical, onDone = viewModel::closeMode) {
                     ToolButton(Icons.AutoMirrored.Outlined.RotateRight, "Rotate", { currentPage?.let { viewModel.rotatePage(it.id) } }, enabled = hasPage)
@@ -408,8 +418,8 @@ fun DocumentDetailScreen(
 
     if (showSignatureEditor) {
         SignatureOverlayEditor(
-            onSave = { bitmap ->
-                currentPage?.let { viewModel.setSignature(it.id, bitmap) }
+            onSave = { bitmap, remember ->
+                currentPage?.let { viewModel.setSignature(it.id, bitmap, remember) }
                 showSignatureEditor = false
             },
             onDismiss = { showSignatureEditor = false },

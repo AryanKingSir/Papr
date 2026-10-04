@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -21,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -28,16 +31,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.core.graphics.createBitmap
 
 @Composable
-fun SignatureOverlayEditor(onSave: (Bitmap) -> Unit, onDismiss: () -> Unit) {
+fun SignatureOverlayEditor(onSave: (signature: Bitmap, remember: Boolean) -> Unit, onDismiss: () -> Unit) {
     var strokes by remember { mutableStateOf(listOf<List<Offset>>()) }
     var currentStroke by remember { mutableStateOf(listOf<Offset>()) }
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
+    // On by default: drawing the same signature again on every page is the chore this saves.
+    var rememberSignature by remember { mutableStateOf(true) }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(16.dp)) {
@@ -81,7 +87,21 @@ fun SignatureOverlayEditor(onSave: (Bitmap) -> Unit, onDismiss: () -> Unit) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 12.dp),
+                        .padding(top = 8.dp)
+                        .toggleable(value = rememberSignature, role = Role.Checkbox, onValueChange = { rememberSignature = it }),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(checked = rememberSignature, onCheckedChange = null)
+                    Text(
+                        "Remember this signature",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(start = 12.dp),
+                    )
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     TextButton(
@@ -94,7 +114,7 @@ fun SignatureOverlayEditor(onSave: (Bitmap) -> Unit, onDismiss: () -> Unit) {
                     Row {
                         TextButton(onClick = onDismiss) { Text("Cancel") }
                         Button(
-                            onClick = { renderSignatureBitmap(strokes, canvasSize)?.let(onSave) },
+                            onClick = { renderSignatureBitmap(strokes, canvasSize)?.let { onSave(it, rememberSignature) } },
                             enabled = strokes.isNotEmpty(),
                         ) { Text("Use signature") }
                     }
