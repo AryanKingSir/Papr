@@ -83,7 +83,9 @@ fun SignatureOverlay(
         val controlRadiusPx = with(LocalDensity.current) { CONTROL_SIZE.toPx() } / 2f
 
         val gestures = when {
-            isPlacing -> Modifier.pointerInput(bounds, pageAspect) {
+            // Keyed on signature too: each saved placement makes a new `draft` state, and a
+            // gesture still holding the old one would save stale values over the last change.
+            isPlacing -> Modifier.pointerInput(bounds, pageAspect, signature) {
                 detectDragGestures(
                     onDrag = { change, drag ->
                         change.consume()
@@ -139,7 +141,7 @@ fun SignatureOverlay(
                         IntOffset((left + width - controlRadiusPx).roundToInt(), (top + height - controlRadiusPx).roundToInt())
                     }
                     .size(CONTROL_SIZE)
-                    .pointerInput(bounds, pageAspect) {
+                    .pointerInput(bounds, pageAspect, signature) {
                         detectDragGestures(
                             onDrag = { change, drag ->
                                 change.consume()
