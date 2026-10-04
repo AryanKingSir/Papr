@@ -45,13 +45,15 @@ import com.papr.scanner.usage.MeteredFeature
 @Composable
 fun ExportOptionsSheet(
     isExporting: Boolean,
+    // The Settings default; the sheet can still switch for this export.
+    initialFormat: ExportFormat,
     allowances: Map<MeteredFeature, Allowance>,
     onExport: (ExportSettings) -> Unit,
     onLockedOptionTap: (MeteredFeature) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState()
-    var format by remember { mutableStateOf(ExportFormat.PDF) }
+    var format by remember { mutableStateOf(initialFormat) }
     var ocrEnabled by remember { mutableStateOf(false) }
     var compressEnabled by remember { mutableStateOf(false) }
     var targetSizeMb by remember { mutableFloatStateOf(1f) }

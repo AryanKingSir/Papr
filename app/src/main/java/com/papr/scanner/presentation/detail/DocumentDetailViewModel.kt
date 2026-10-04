@@ -35,6 +35,7 @@ import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -58,6 +59,7 @@ class DocumentDetailViewModel(
     private val pageImageExporter: PageImageExporter,
     private val usageTracker: UsageTracker,
     private val savedSignatureStore: SavedSignatureStore,
+    defaultExportFormatFlow: Flow<ExportFormat>,
     private val appContext: Context,
 ) : ViewModel() {
 
@@ -120,6 +122,9 @@ class DocumentDetailViewModel(
     val errors: SharedFlow<String> = _errors.asSharedFlow()
 
     val isPro: StateFlow<Boolean> = usageTracker.isPro.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    val defaultExportFormat: StateFlow<ExportFormat> =
+        defaultExportFormatFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ExportFormat.PDF)
 
     val allowances: StateFlow<Map<MeteredFeature, Allowance>> =
         usageTracker.allowances.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())

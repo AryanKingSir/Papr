@@ -86,6 +86,7 @@ import com.papr.scanner.presentation.detail.components.TextNoteDialog
 import com.papr.scanner.presentation.detail.markup.defaultStyle
 import com.papr.scanner.presentation.detail.markup.sizeFraction
 import com.papr.scanner.presentation.paywall.ProUpgradeSheet
+import kotlinx.coroutines.flow.map
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -104,12 +105,14 @@ fun DocumentDetailScreen(
             container.pageImageExporter,
             container.usageTracker,
             container.savedSignatureStore,
+            container.userPreferencesRepository.settings.map { it.defaultExportFormat },
             container.appContext,
         )
     }
     val uiState by viewModel.uiState.collectAsState()
     val allowances by viewModel.allowances.collectAsState()
     val isPro by viewModel.isPro.collectAsState()
+    val defaultExportFormat by viewModel.defaultExportFormat.collectAsState()
     val context = LocalContext.current
     val currentOnBack by rememberUpdatedState(onBack)
 
@@ -454,6 +457,7 @@ fun DocumentDetailScreen(
     if (showExportOptions) {
         ExportOptionsSheet(
             isExporting = uiState.isExporting,
+            initialFormat = defaultExportFormat,
             allowances = allowances,
             onExport = viewModel::export,
             onLockedOptionTap = { feature -> paywallReason = feature.limitReachedMessage },
