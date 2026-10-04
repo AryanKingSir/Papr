@@ -25,9 +25,10 @@ import androidx.compose.ui.unit.dp
 import com.papr.scanner.billing.BillingState
 import com.papr.scanner.presentation.common.paprViewModel
 
+/** [reason] says why the sheet opened when a free limit stopped the user, e.g. a used-up monthly allowance. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProUpgradeSheet(onDismiss: () -> Unit) {
+fun ProUpgradeSheet(onDismiss: () -> Unit, reason: String? = null) {
     val viewModel = paprViewModel { container -> ProUpgradeViewModel(container.billingManager) }
     val state by viewModel.state.collectAsState()
     val isProUnlocked by viewModel.isProUnlocked.collectAsState()
@@ -48,6 +49,21 @@ fun ProUpgradeSheet(onDismiss: () -> Unit) {
                 modifier = Modifier.padding(bottom = 12.dp),
             )
             Text("Papr Pro", style = MaterialTheme.typography.titleLarge)
+            if (reason != null && !isProUnlocked) {
+                Text(
+                    reason,
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+            }
+            Text(
+                "Unlimited searchable-text, password and compressed exports, unlimited merges, and confidential marks.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 8.dp),
+            )
 
             when {
                 isProUnlocked -> {
