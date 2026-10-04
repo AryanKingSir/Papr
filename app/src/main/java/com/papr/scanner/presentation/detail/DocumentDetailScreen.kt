@@ -22,7 +22,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.NoteAdd
 import androidx.compose.material.icons.automirrored.outlined.RotateRight
 import androidx.compose.material.icons.outlined.BookmarkBorder
-import androidx.compose.material.icons.outlined.BookmarkRemove
 import androidx.compose.material.icons.outlined.BorderColor
 import androidx.compose.material.icons.outlined.Brush
 import androidx.compose.material.icons.outlined.Create
@@ -73,6 +72,7 @@ import com.papr.scanner.domain.model.NormalizedPoint
 import com.papr.scanner.domain.model.Page
 import com.papr.scanner.domain.model.TextNote
 import com.papr.scanner.presentation.common.MainToolbar
+import com.papr.scanner.presentation.common.SignatureOverlayEditor
 import com.papr.scanner.presentation.common.ToolButton
 import com.papr.scanner.presentation.common.paprViewModel
 import com.papr.scanner.presentation.detail.components.EraserIcon
@@ -81,7 +81,6 @@ import com.papr.scanner.presentation.detail.components.MarkupOptionsRow
 import com.papr.scanner.presentation.detail.components.OrganizePagesScreen
 import com.papr.scanner.presentation.detail.components.PagePager
 import com.papr.scanner.presentation.detail.components.PageThumbnailStrip
-import com.papr.scanner.presentation.detail.components.SignatureOverlayEditor
 import com.papr.scanner.presentation.detail.components.SubToolbar
 import com.papr.scanner.presentation.detail.components.TextNoteDialog
 import com.papr.scanner.presentation.detail.markup.defaultStyle
@@ -104,6 +103,7 @@ fun DocumentDetailScreen(
             container.pdfEngine,
             container.pageImageExporter,
             container.usageTracker,
+            container.savedSignatureStore,
             container.appContext,
         )
     }
@@ -301,7 +301,11 @@ fun DocumentDetailScreen(
             when {
                 uiState.isPlacingSignature -> HintRow("Drag the signature to move it. Drag its corner to resize.")
                 uiState.mode == EditorMode.SIGN -> HintRow(
-                    if (uiState.hasSavedSignature) "Use your saved signature, or draw a new one." else "Draw your signature, then drag it into place."
+                    if (uiState.hasSavedSignature) {
+                        "Use your saved signature, or draw a one-off. Change the saved one in Settings."
+                    } else {
+                        "Draw your signature, then drag it into place."
+                    }
                 )
                 inMarkup && uiState.markupTool == MarkupTool.TEXT ->
                     HintRow("Tap to add text. Tap text to edit it, drag to move it.")
@@ -370,13 +374,10 @@ fun DocumentDetailScreen(
                     ToolButton(Icons.Outlined.Draw, "Draw new", { showSignatureEditor = true }, enabled = hasPage)
                     ToolButton(
                         Icons.Outlined.Delete,
-                        "Remove",
+                        "Remove from page",
                         { currentPage?.let { viewModel.removeSignature(it.id) } },
                         enabled = currentPage?.signature != null,
                     )
-                    if (uiState.hasSavedSignature) {
-                        ToolButton(Icons.Outlined.BookmarkRemove, "Forget saved", viewModel::forgetSavedSignature)
-                    }
                 }
                 EditorMode.PAGES -> SubToolbar(vertical, onDone = viewModel::closeMode) {
                     ToolButton(Icons.AutoMirrored.Outlined.RotateRight, "Rotate", { currentPage?.let { viewModel.rotatePage(it.id) } }, enabled = hasPage)
@@ -446,6 +447,7 @@ fun DocumentDetailScreen(
                 showSignatureEditor = false
             },
             onDismiss = { showSignatureEditor = false },
+            showRememberOption = !uiState.hasSavedSignature,
         )
     }
 

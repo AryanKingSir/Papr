@@ -7,6 +7,7 @@ import androidx.room.Room
 import com.papr.scanner.billing.BillingManager
 import com.papr.scanner.billing.RealPlayBillingClient
 import com.papr.scanner.core.Constants
+import com.papr.scanner.data.local.SavedSignatureStore
 import com.papr.scanner.data.local.datastore.UserPreferencesRepository
 import com.papr.scanner.data.local.db.MIGRATION_1_2
 import com.papr.scanner.data.local.db.MIGRATION_2_3
@@ -66,6 +67,8 @@ class AppContainer(private val context: Context) {
     val documentMerger: DocumentMerger by lazy {
         DocumentMerger(documentRepository, documentDeleter, context)
     }
+
+    val savedSignatureStore: SavedSignatureStore by lazy { SavedSignatureStore(context, applicationScope) }
 
     val userPreferencesRepository: UserPreferencesRepository by lazy {
         UserPreferencesRepository(context.userPreferencesDataStore)

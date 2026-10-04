@@ -1,4 +1,4 @@
-package com.papr.scanner.presentation.detail.components
+package com.papr.scanner.presentation.common
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
@@ -38,12 +38,18 @@ import androidx.compose.ui.window.Dialog
 import androidx.core.graphics.createBitmap
 
 @Composable
-fun SignatureOverlayEditor(onSave: (signature: Bitmap, remember: Boolean) -> Unit, onDismiss: () -> Unit) {
+fun SignatureOverlayEditor(
+    onSave: (signature: Bitmap, remember: Boolean) -> Unit,
+    onDismiss: () -> Unit,
+    // Off where remembering isn't the choice to make here: in Settings (where it always is) or
+    // in the editor once a signature is saved (replacing it only happens in Settings).
+    showRememberOption: Boolean = true,
+) {
     var strokes by remember { mutableStateOf(listOf<List<Offset>>()) }
     var currentStroke by remember { mutableStateOf(listOf<Offset>()) }
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
     // On by default: drawing the same signature again on every page is the chore this saves.
-    var rememberSignature by remember { mutableStateOf(true) }
+    var rememberSignature by remember { mutableStateOf(showRememberOption) }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(16.dp)) {
@@ -84,19 +90,21 @@ fun SignatureOverlayEditor(onSave: (signature: Bitmap, remember: Boolean) -> Uni
                         }
                     }
                 }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp)
-                        .toggleable(value = rememberSignature, role = Role.Checkbox, onValueChange = { rememberSignature = it }),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Checkbox(checked = rememberSignature, onCheckedChange = null)
-                    Text(
-                        "Remember this signature",
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(start = 12.dp),
-                    )
+                if (showRememberOption) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                            .toggleable(value = rememberSignature, role = Role.Checkbox, onValueChange = { rememberSignature = it }),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(checked = rememberSignature, onCheckedChange = null)
+                        Text(
+                            "Remember this signature",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(start = 12.dp),
+                        )
+                    }
                 }
                 Row(
                     modifier = Modifier

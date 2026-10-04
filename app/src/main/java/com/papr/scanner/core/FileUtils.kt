@@ -31,10 +31,6 @@ object FileUtils {
     fun documentDir(context: Context, documentId: Long): File =
         File(context.filesDir, "documents/$documentId").apply { mkdirs() }
 
-    /** The one signature kept for reuse; only ever copied into a document, never referenced from one. */
-    fun savedSignatureFile(context: Context): File =
-        File(context.filesDir, "signature").apply { mkdirs() }.let { File(it, "saved_signature.png") }
-
     fun thumbnailFile(context: Context, documentId: Long): File =
         File(context.filesDir, "thumbnails").apply { mkdirs() }.let { File(it, "$documentId.jpg") }
 

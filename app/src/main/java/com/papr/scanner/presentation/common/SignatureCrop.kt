@@ -1,4 +1,4 @@
-package com.papr.scanner.presentation.detail.components
+package com.papr.scanner.presentation.common
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntRect

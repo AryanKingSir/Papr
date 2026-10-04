@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.papr.scanner.core.FileUtils
+import com.papr.scanner.data.local.SavedSignatureStore
 import com.papr.scanner.data.repository.DocumentDeleter
 import com.papr.scanner.data.repository.DocumentRepository
 import com.papr.scanner.domain.model.ConfidentialMarkStroke
@@ -56,6 +57,7 @@ class DocumentDetailViewModel(
     private val pdfEngine: PdfEngine,
     private val pageImageExporter: PageImageExporter,
     private val usageTracker: UsageTracker,
+    private val savedSignatureStore: SavedSignatureStore,
     private val appContext: Context,
 ) : ViewModel() {
 
@@ -128,8 +130,7 @@ class DocumentDetailViewModel(
 
     init {
         viewModelScope.launch {
-            val saved = withContext(Dispatchers.IO) { FileUtils.savedSignatureFile(appContext).exists() }
-            localState.update { it.copy(hasSavedSignature = saved) }
+            savedSignatureStore.state.collect { saved -> localState.update { it.copy(hasSavedSignature = saved != null) } }
         }
     }
 
@@ -308,8 +309,9 @@ class DocumentDetailViewModel(
 
     /**
      * Saves a freshly drawn signature onto the page (replacing any existing one),
-     * ready to place in Sign mode - and, when [remember] is set, keeps it as the
-     * saved signature for next time.
+     * ready to place in Sign mode - and, when [remember] is set and no signature
+     * is saved yet, keeps it as the saved signature. A saved signature is only
+     * ever replaced from Settings.
      */
     fun setSignature(pageId: Long, signatureBitmap: Bitmap, remember: Boolean) {
         launchEdit("Couldn't add the signature") {
@@ -319,10 +321,9 @@ class DocumentDetailViewModel(
                 withContext(Dispatchers.IO) {
                     // PNG keeps the transparent background, so only the ink covers the page.
                     file.outputStream().use { signatureBitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-                    if (remember) file.copyTo(FileUtils.savedSignatureFile(appContext), overwrite = true)
                 }
+                if (remember && savedSignatureStore.state.value == null) savedSignatureStore.saveCopyOf(file)
                 placeSignature(page, file, aspectRatio = signatureBitmap.height / signatureBitmap.width.toFloat())
-                if (remember) localState.update { it.copy(hasSavedSignature = true) }
             } finally {
                 signatureBitmap.recycle()
             }
@@ -333,18 +334,10 @@ class DocumentDetailViewModel(
     fun useSavedSignature(pageId: Long) {
         launchEdit("Couldn't add the saved signature") {
             val page = documentRepository.getPage(pageId) ?: return@launchEdit
-            val saved = FileUtils.savedSignatureFile(appContext)
             val file = newSignatureFile()
-            withContext(Dispatchers.IO) { saved.copyTo(file) }
+            if (!savedSignatureStore.copyTo(file)) return@launchEdit
             // A signature's aspect ratio is height over width; the image helper gives width over height.
             placeSignature(page, file, aspectRatio = 1f / FileUtils.imageAspectRatio(file))
-        }
-    }
-
-    fun forgetSavedSignature() {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) { FileUtils.savedSignatureFile(appContext).delete() }
-            localState.update { it.copy(hasSavedSignature = false) }
         }
     }
 
