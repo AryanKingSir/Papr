@@ -8,8 +8,8 @@ import android.graphics.Matrix
 import android.net.Uri
 import androidx.core.content.FileProvider
 import com.papr.scanner.domain.model.Page
-import com.papr.scanner.pdf.ConfidentialMarkRenderer
-import com.papr.scanner.pdf.SignatureStamper
+import com.papr.scanner.pdf.PageOverlayRenderer
+import com.papr.scanner.pdf.overlays
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
@@ -94,10 +94,7 @@ object FileUtils {
                 },
             ) ?: throw IOException("Failed to decode bitmap: ${sourcePageFile.absolutePath}")
             val canvas = Canvas(bitmap)
-            page.signature?.let { SignatureStamper().draw(canvas, it, bitmap.width, bitmap.height) }
-            if (page.confidentialMarks.isNotEmpty()) {
-                ConfidentialMarkRenderer().draw(canvas, page.confidentialMarks, bitmap.width, bitmap.height)
-            }
+            PageOverlayRenderer().draw(canvas, page.overlays(), bitmap.width, bitmap.height)
             val destination = thumbnailFile(context, page.documentId)
             destination.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it) }
             bitmap.recycle()

@@ -16,6 +16,7 @@ import com.papr.scanner.domain.model.rotatedClockwise
 import com.papr.scanner.pdf.PasswordProtection
 import com.papr.scanner.pdf.PdfEngine
 import com.papr.scanner.pdf.PdfGenerationOptions
+import com.papr.scanner.pdf.overlays
 import com.papr.scanner.pdf.TextRecognitionUnavailableException
 import com.papr.scanner.usage.Allowance
 import com.papr.scanner.usage.MeteredFeature
@@ -311,11 +312,8 @@ class DocumentDetailViewModel(
                         PdfGenerationOptions(
                             ocrEnabled = settings.ocrEnabled,
                             // Keyed by position in the export, which is what PdfEngine's page index means.
-                            signaturesByPageIndex = pages.mapIndexedNotNull { index, page ->
-                                page.signature?.let { index to it }
-                            }.toMap(),
-                            confidentialMarksByPageIndex = pages.mapIndexedNotNull { index, page ->
-                                page.confidentialMarks.takeIf { it.isNotEmpty() }?.let { index to it }
+                            overlaysByPageIndex = pages.mapIndexedNotNull { index, page ->
+                                page.overlays().takeUnless { it.isEmpty }?.let { index to it }
                             }.toMap(),
                             passwordProtection = settings.password
                                 .takeIf { settings.passwordEnabled && it.isNotBlank() }

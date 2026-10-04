@@ -76,7 +76,12 @@ fun PagePager(
                     val imageSize = rememberImageSize(File(page.imageUri))
                     val isCurrent = index == currentPageIndex
                     if (imageSize != null) {
-                        // Same layering as the PDF export: signature under marks.
+                        // Same layering as the PDF export: markup, then the signature, then marks.
+                        MarkupOverlay(
+                            imageSize = imageSize,
+                            annotations = page.annotations,
+                            modifier = Modifier.fillMaxSize(),
+                        )
                         page.signature?.let { signature ->
                             SignatureOverlay(
                                 signature = signature,

@@ -1,7 +1,5 @@
 package com.papr.scanner.pdf
 
-import com.papr.scanner.domain.model.ConfidentialMarkStroke
-import com.papr.scanner.domain.model.PageSignature
 import com.papr.scanner.pdf.security.PdfEncryptor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -12,8 +10,7 @@ data class PasswordProtection(val userPassword: String, val ownerPassword: Strin
 
 data class PdfGenerationOptions(
     val ocrEnabled: Boolean = false,
-    val signaturesByPageIndex: Map<Int, PageSignature> = emptyMap(),
-    val confidentialMarksByPageIndex: Map<Int, List<ConfidentialMarkStroke>> = emptyMap(),
+    val overlaysByPageIndex: Map<Int, PageOverlays> = emptyMap(),
     val passwordProtection: PasswordProtection? = null,
     val targetSizeBytes: Long? = null,
 )
@@ -21,8 +18,7 @@ data class PdfGenerationOptions(
 class PdfEngine(
     private val bitmapPdfCompiler: BitmapPdfCompiler,
     private val ocrTextStamper: OcrTextStamper,
-    private val signatureStamper: SignatureStamper,
-    private val confidentialMarkRenderer: ConfidentialMarkRenderer,
+    private val pageOverlayRenderer: PageOverlayRenderer,
     private val invisibleTextLayerInjector: InvisibleTextLayerInjector,
     private val pdfEncryptor: PdfEncryptor,
 ) {
@@ -43,12 +39,8 @@ class PdfEngine(
                 // as separate PDF objects: a mark can't be lifted off in a PDF editor
                 // to reveal what's beneath, overlays shrink with a compression target,
                 // and the mark's label font never has to be embedded in the file.
-                // Signature first, so a confidential mark always stays on top.
-                options.signaturesByPageIndex[pageIndex]?.let { signature ->
-                    signatureStamper.draw(canvas, signature, bitmap.width, bitmap.height)
-                }
-                options.confidentialMarksByPageIndex[pageIndex]?.let { marks ->
-                    confidentialMarkRenderer.draw(canvas, marks, bitmap.width, bitmap.height)
+                options.overlaysByPageIndex[pageIndex]?.let { overlays ->
+                    pageOverlayRenderer.draw(canvas, overlays, bitmap.width, bitmap.height)
                 }
             },
             onPageDrawn = { bitmap, pageIndex, placement ->

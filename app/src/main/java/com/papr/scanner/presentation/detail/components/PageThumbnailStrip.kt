@@ -65,9 +65,15 @@ fun PageThumbnailStrip(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
                     )
-                    if (page.signature != null || page.confidentialMarks.isNotEmpty()) {
+                    if (page.signature != null || page.confidentialMarks.isNotEmpty() || page.annotations.isNotEmpty()) {
                         val imageSize = rememberImageSize(File(page.imageUri))
                         if (imageSize != null) {
+                            MarkupOverlay(
+                                imageSize = imageSize,
+                                annotations = page.annotations,
+                                crop = true,
+                                modifier = Modifier.fillMaxSize(),
+                            )
                             page.signature?.let { signature ->
                                 SignatureOverlay(
                                     signature = signature,
