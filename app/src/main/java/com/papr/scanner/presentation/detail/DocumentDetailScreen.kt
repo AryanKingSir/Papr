@@ -89,6 +89,7 @@ fun DocumentDetailScreen(
     }
     val uiState by viewModel.uiState.collectAsState()
     val allowances by viewModel.allowances.collectAsState()
+    val isPro by viewModel.isPro.collectAsState()
     val context = LocalContext.current
     val currentOnBack by rememberUpdatedState(onBack)
 
@@ -226,9 +227,13 @@ fun DocumentDetailScreen(
 
             when {
                 uiState.isMarkingConfidential -> HintRow(
-                    text = "Drag to cover content, tap a mark to remove it. Covered text can still be found " +
-                        "by searching in Papr.",
-                    onDone = viewModel::toggleMarkingConfidential,
+                    text = if (isPro) {
+                        "Drag to cover content, tap a mark to remove it. Covered text can still be found " +
+                            "by searching in Papr."
+                    } else {
+                        "Tap a mark to remove it. Adding marks needs Papr Pro."
+                    },
+                    onDone = viewModel::stopMarkingConfidential,
                 )
                 uiState.isPlacingSignature -> HintRow(
                     text = "Drag the signature to move it. Drag its corner to resize.",
@@ -258,7 +263,16 @@ fun DocumentDetailScreen(
                     tint = if (uiState.isPlacingSignature) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                 )
             }
-            IconButton(onClick = { viewModel.toggleMarkingConfidential() }, enabled = currentPage != null) {
+            IconButton(
+                onClick = {
+                    if (uiState.isMarkingConfidential) {
+                        viewModel.stopMarkingConfidential()
+                    } else {
+                        viewModel.startMarkingConfidential(pageHasMarks = currentPage?.confidentialMarks?.isNotEmpty() == true)
+                    }
+                },
+                enabled = currentPage != null,
+            ) {
                 Icon(
                     Icons.Filled.Brush,
                     contentDescription = "Mark confidential",

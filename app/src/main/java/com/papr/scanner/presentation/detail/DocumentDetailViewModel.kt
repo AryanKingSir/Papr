@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -90,6 +91,8 @@ class DocumentDetailViewModel(
 
     private val _errors = MutableSharedFlow<String>()
     val errors: SharedFlow<String> = _errors.asSharedFlow()
+
+    val isPro: StateFlow<Boolean> = usageTracker.isPro.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     val allowances: StateFlow<Map<MeteredFeature, Allowance>> =
         usageTracker.allowances.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
@@ -186,16 +189,34 @@ class DocumentDetailViewModel(
         }
     }
 
-    fun toggleMarkingConfidential() {
-        localState.update {
-            val marking = !it.isMarkingConfidential
-            it.copy(isMarkingConfidential = marking, isPlacingSignature = it.isPlacingSignature && !marking)
+    /**
+     * Adding marks needs Pro, but a free user can still enter marking mode on a
+     * page that already has marks (made before Pro was needed, or carried in by
+     * a merge) to remove them.
+     */
+    fun startMarkingConfidential(pageHasMarks: Boolean) {
+        viewModelScope.launch {
+            if (pageHasMarks || usageTracker.isPro.first()) {
+                localState.update { it.copy(isMarkingConfidential = true, isPlacingSignature = false) }
+            } else {
+                _proSheetRequests.emit(MARKS_NEED_PRO)
+            }
         }
     }
 
+    fun stopMarkingConfidential() {
+        localState.update { it.copy(isMarkingConfidential = false) }
+    }
+
     fun addConfidentialMarkStroke(pageId: Long, stroke: ConfidentialMarkStroke) {
-        updatePage(pageId, "Couldn't add the mark") { page ->
-            page.copy(confidentialMarks = page.confidentialMarks + stroke)
+        viewModelScope.launch {
+            if (!usageTracker.isPro.first()) {
+                _proSheetRequests.emit(MARKS_NEED_PRO)
+                return@launch
+            }
+            updatePage(pageId, "Couldn't add the mark") { page ->
+                page.copy(confidentialMarks = page.confidentialMarks + stroke)
+            }
         }
     }
 
@@ -371,6 +392,7 @@ class DocumentDetailViewModel(
 
     private companion object {
         const val BYTES_PER_MB = 1024 * 1024
+        const val MARKS_NEED_PRO = "Adding confidential marks needs Papr Pro."
     }
 }
 
