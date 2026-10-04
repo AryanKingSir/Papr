@@ -53,6 +53,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.papr.scanner.core.FileUtils
@@ -131,6 +132,9 @@ fun DocumentDetailScreen(
                     } else {
                         Text(
                             text = uiState.document?.title.orEmpty(),
+                            // One line, like the home grid: a long title would otherwise grow the bar and push the page down.
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.clickable {
                                 val title = uiState.document?.title.orEmpty()
                                 // All selected, so typing replaces it; arrow keys or a tap keep it.
