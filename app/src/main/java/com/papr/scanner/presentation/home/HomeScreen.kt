@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MergeType
 import androidx.compose.material.icons.filled.Close
@@ -38,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -52,6 +54,8 @@ import com.papr.scanner.presentation.home.components.DocumentSearchBar
 import com.papr.scanner.presentation.home.components.EmptyState
 import com.papr.scanner.presentation.home.components.FilterChipsRow
 import com.papr.scanner.presentation.home.components.NoMatchesState
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,6 +72,16 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         viewModel.errors.collect { message -> Toast.makeText(context, message, Toast.LENGTH_LONG).show() }
+    }
+    // A changed search or filter starts the results from the top. Without this the grid keeps
+    // its first visible document in place, so clearing a filter left newer documents hidden
+    // above it. drop(1): coming back to Home keeps the scroll position it was left at.
+    val gridState = rememberLazyGridState()
+    LaunchedEffect(gridState) {
+        snapshotFlow { Triple(uiState.searchQuery.trim(), uiState.selectedFolder, uiState.selectedDateRange) }
+            .distinctUntilChanged()
+            .drop(1)
+            .collect { gridState.scrollToItem(0) }
     }
     // Back ends a selection, like the Cancel button, rather than leaving the app.
     BackHandler(enabled = uiState.isSelectionMode) { viewModel.clearSelection() }
@@ -154,6 +168,7 @@ fun HomeScreen(
                 if (uiState.hasActiveFilters) NoMatchesState() else EmptyState(onScanClick = onScanClick)
             } else {
                 LazyVerticalGrid(
+                    state = gridState,
                     // Two columns on a portrait phone (down to 360dp wide), more in landscape or on tablets.
                     columns = GridCells.Adaptive(minSize = 150.dp),
                     // Extra bottom room so the last row can scroll clear of the scan button.
