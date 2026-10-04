@@ -138,7 +138,7 @@ The editor's bottom bar is four labelled groups - Markup, Sign, Pages, Export - 
 4. Eraser: dragging across lines, highlights, text or confidential marks removes them whole (the signature is never erased). Undo/Redo step through every change in the session, across pages; they reset when Markup is closed. ✓ emulator 2026-10-04
 5. Rotate a page with markup: the lines, text (turned with the page) and marks stay on the same content, at the same thickness. ✓ emulator 2026-10-04
 6. Export a PDF and images: markup, signature and confidential marks are baked in, confidential marks on top. A document exported before this update comes out byte-identical. ✓ emulator 2026-10-04 (debug and release)
-7. Sign: "Remember this signature" (on by default) saves it; "Use saved" puts it on another page or document at the right proportions; "Forget saved" removes it. ✓ emulator 2026-10-04
+7. Sign: with nothing saved, "Remember this signature" (on by default) saves it; "Use saved" puts it on another page or document at the right proportions. (Replacing or removing the saved signature moved to Settings - see section 12.) ✓ emulator 2026-10-04
 8. Pages > Organize: hold and drag a page to reorder (the editor and thumbnail follow); Select pages to rotate or delete them together; deleting every page warns that the document goes too; tapping a page opens it. ✓ emulator 2026-10-04 (debug and release)
 9. Export > Images: every page as a JPG through the share sheet; free, even with PDF options left on. ✓ emulator 2026-10-04 (debug and release)
 10. Home: Filter button (with a count) opens date and folder filters; filters in use are removable chips; Pro button hidden for Pro owners; selecting shows labelled Delete / Merge above the navigation bar; the scan button reads "Scan". ✓ emulator 2026-10-04
@@ -146,4 +146,17 @@ The editor's bottom bar is four labelled groups - Markup, Sign, Pages, Export - 
 12. Upgrading from the previous version (database v3 to v4) keeps every document, mark and signature. ✓ emulator 2026-10-04
 13. Landscape (tools on a side rail, markup options under the page) and the largest font size (tool rows scroll sideways). ✓ emulator 2026-10-04
 14. Drawing, erasing and dragging text with a finger on a real phone feel right - no lag, strokes follow the finger, a stray touch doesn't swipe pages while marking up.
+
+## 12. Settings (2026-10-04)
+
+Opened from the gear on the home screen (spec: `specs/2026-10-04-settings-design.md`).
+
+1. Theme System / Light / Dark applies at once, the status and navigation bar icons follow it, and it survives a restart. Material You off uses Papr's blue; on Android 11 and below the switch is disabled with "Needs Android 12 or later". ✓ emulator 2026-10-04 (Android 12 and 7)
+2. Saved signature: Settings shows it with Draw new signature (replaces it, preview updates) and Remove (asks first; signed pages keep theirs), or Add a signature when none is saved. ✓ emulator 2026-10-04
+3. Editor, signature saved: Sign offers Use saved, Draw new (a one-off - no Remember box, the saved one is untouched) and Remove from page; no Forget. With nothing saved, Draw new offers Remember. ✓ emulator 2026-10-04
+4. Merge: "Delete the originals" starts at the Settings default; when on the button reads "Merge and delete originals", and after merging the originals, their files and thumbnails are gone. Off keeps them. ✓ emulator 2026-10-04
+5. "Export starts with" Images opens the export sheet on Images. ✓ emulator 2026-10-04
+6. Restore purchase: without Google Play it says it couldn't reach it; on a Play-installed build with Pro bought on the account it restores Pro. ✓ emulator 2026-10-04 (no-Play case only; the restore itself needs a Play testing track build)
+7. The home screen logo matches the app icon in light and dark; the select box on Home and in Organize pages is a single squircle that shows on white and coloured pages. ✓ emulator 2026-10-04
+8. Settings at the largest font size and in landscape: nothing overlaps (the signature buttons wrap). ✓ emulator 2026-10-04 (release)
 
