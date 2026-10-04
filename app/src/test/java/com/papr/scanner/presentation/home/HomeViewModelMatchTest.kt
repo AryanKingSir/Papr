@@ -40,4 +40,10 @@ class HomeViewModelMatchTest {
         val result = matchDocument(query = "license", title = "7sept", pageTexts = listOf(null, "license"))
         assertEquals(SearchMatch.CONTENT, result)
     }
+
+    @Test
+    fun `ignores spaces around the query, like the one a keyboard adds after a suggested word`() {
+        val result = matchDocument(query = " license ", title = "Drivers License", pageTexts = emptyList())
+        assertEquals(SearchMatch.TITLE, result)
+    }
 }

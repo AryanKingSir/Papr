@@ -174,9 +174,11 @@ internal enum class SearchMatch { TITLE, CONTENT, NONE }
 
 /** How (if at all) [query] matches a document, given its [title] and its pages' recognized text - a title match outranks a content-only match. */
 internal fun matchDocument(query: String, title: String, pageTexts: List<String?>): SearchMatch {
+    // Keyboards add a space after a suggested word; it shouldn't stop "budget " matching "Budget 2026".
+    val term = query.trim()
     return when {
-        title.contains(query, ignoreCase = true) -> SearchMatch.TITLE
-        pageTexts.any { it != null && it.contains(query, ignoreCase = true) } -> SearchMatch.CONTENT
+        title.contains(term, ignoreCase = true) -> SearchMatch.TITLE
+        pageTexts.any { it != null && it.contains(term, ignoreCase = true) } -> SearchMatch.CONTENT
         else -> SearchMatch.NONE
     }
 }
