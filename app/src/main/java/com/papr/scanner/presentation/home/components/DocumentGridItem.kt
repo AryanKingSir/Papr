@@ -10,11 +10,9 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -28,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.papr.scanner.domain.model.Document
 import com.papr.scanner.presentation.common.PageImage
+import com.papr.scanner.presentation.common.SelectionCheck
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -89,15 +88,12 @@ fun DocumentGridItem(
                 }
             }
             if (selectionMode) {
-                Surface(
+                SelectionCheck(
+                    selected = isSelected,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(6.dp),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                ) {
-                    Checkbox(checked = isSelected, onCheckedChange = null, modifier = Modifier.padding(2.dp))
-                }
+                        .padding(10.dp),
+                )
             }
         }
         Column(modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 12.dp)) {

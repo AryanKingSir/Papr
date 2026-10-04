@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -25,7 +24,6 @@ import androidx.compose.material.icons.automirrored.outlined.RotateRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -51,6 +49,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.papr.scanner.domain.model.Page
 import com.papr.scanner.presentation.common.MainToolbar
+import com.papr.scanner.presentation.common.SelectionCheck
 import com.papr.scanner.presentation.common.ToolButton
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyGridState
@@ -200,15 +199,12 @@ fun OrganizePagesScreen(
                                 ) {
                                     PageThumbnail(page, contentDescription = "Page ${index + 1}", modifier = Modifier.fillMaxSize())
                                     if (selecting) {
-                                        Surface(
-                                            shape = CircleShape,
-                                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                                        SelectionCheck(
+                                            selected = isSelected,
                                             modifier = Modifier
                                                 .align(Alignment.TopEnd)
-                                                .padding(4.dp),
-                                        ) {
-                                            Checkbox(checked = isSelected, onCheckedChange = null, modifier = Modifier.padding(2.dp))
-                                        }
+                                                .padding(8.dp),
+                                        )
                                     }
                                 }
                             }
