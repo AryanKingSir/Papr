@@ -17,9 +17,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.papr.scanner.domain.model.ConfidentialMarkStroke
+import com.papr.scanner.domain.model.InkStroke
+import com.papr.scanner.domain.model.NormalizedPoint
 import com.papr.scanner.domain.model.Page
+import com.papr.scanner.domain.model.PageAnnotation
+import com.papr.scanner.domain.model.TextNote
 import com.papr.scanner.presentation.common.PageImage
 import com.papr.scanner.presentation.common.rememberImageSize
+import com.papr.scanner.presentation.detail.MarkupTool
+import com.papr.scanner.presentation.detail.markup.ToolStyle
 import java.io.File
 
 @Composable
@@ -28,13 +34,20 @@ fun PagePager(
     revision: Int,
     currentPageIndex: Int,
     onPageChanged: (Int) -> Unit,
-    isMarkingConfidential: Boolean,
+    // Non-null while Markup is open: the tool the current page's touches go to.
+    markupTool: MarkupTool?,
+    toolStyle: ToolStyle?,
     isPlacingSignature: Boolean,
-    onMarkStrokeAdded: (Page, ConfidentialMarkStroke) -> Unit,
-    onMarkStrokeErased: (Page, ConfidentialMarkStroke) -> Unit,
-    onSignatureTap: (Page) -> Unit,
+    // Null when tapping a signature should do nothing (e.g. while marking up over it).
+    onSignatureTap: ((Page) -> Unit)?,
     onSignaturePlacementChange: (page: Page, x: Float, y: Float, width: Float) -> Unit,
     onSignatureRemove: (Page) -> Unit,
+    onMarkStrokeAdded: (Page, ConfidentialMarkStroke) -> Unit,
+    onMarkStrokeErased: (Page, ConfidentialMarkStroke) -> Unit,
+    onStrokeDrawn: (Page, InkStroke) -> Unit,
+    onErase: (Page, List<PageAnnotation>, List<ConfidentialMarkStroke>) -> Unit,
+    onTextTap: (Page, TextNote?, NormalizedPoint) -> Unit,
+    onTextMoved: (Page, TextNote, Float, Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val pagerState = rememberPagerState(initialPage = currentPageIndex) { pages.size }
@@ -51,8 +64,8 @@ fun PagePager(
 
     HorizontalPager(
         state = pagerState,
-        // Drawing a mark or dragging a signature must never turn into a page swipe.
-        userScrollEnabled = !isMarkingConfidential && !isPlacingSignature,
+        // Drawing or dragging a signature must never turn into a page swipe.
+        userScrollEnabled = markupTool == null && !isPlacingSignature,
         modifier = modifier,
     ) { index ->
         val page = pages.getOrNull(index)
@@ -77,9 +90,17 @@ fun PagePager(
                     val isCurrent = index == currentPageIndex
                     if (imageSize != null) {
                         // Same layering as the PDF export: markup, then the signature, then marks.
+                        val tool = markupTool.takeIf { isCurrent }
                         MarkupOverlay(
                             imageSize = imageSize,
                             annotations = page.annotations,
+                            tool = tool,
+                            style = toolStyle,
+                            confidentialMarks = page.confidentialMarks,
+                            onStrokeDrawn = { stroke -> onStrokeDrawn(page, stroke) },
+                            onErase = { annotations, marks -> onErase(page, annotations, marks) },
+                            onTextTap = { note, anchor -> onTextTap(page, note, anchor) },
+                            onTextMoved = { note, x, y -> onTextMoved(page, note, x, y) },
                             modifier = Modifier.fillMaxSize(),
                         )
                         page.signature?.let { signature ->
@@ -87,7 +108,7 @@ fun PagePager(
                                 signature = signature,
                                 imageSize = imageSize,
                                 isPlacing = isPlacingSignature && isCurrent,
-                                onTap = { onSignatureTap(page) }.takeIf { isCurrent && !isMarkingConfidential },
+                                onTap = onSignatureTap?.takeIf { isCurrent }?.let { tap -> { tap(page) } },
                                 onPlacementChange = { x, y, width -> onSignaturePlacementChange(page, x, y, width) },
                                 onRemove = { onSignatureRemove(page) },
                                 modifier = Modifier.fillMaxSize(),
@@ -96,7 +117,7 @@ fun PagePager(
                         ConfidentialMarkOverlay(
                             imageSize = imageSize,
                             marks = page.confidentialMarks,
-                            editingEnabled = isMarkingConfidential && isCurrent,
+                            editingEnabled = tool == MarkupTool.CONFIDENTIAL,
                             onStrokeAdded = { stroke -> onMarkStrokeAdded(page, stroke) },
                             onStrokeErased = { stroke -> onMarkStrokeErased(page, stroke) },
                             modifier = Modifier.fillMaxSize(),

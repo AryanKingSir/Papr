@@ -2,9 +2,8 @@ package com.papr.scanner.presentation.detail
 
 import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -14,32 +13,38 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.filled.NoteAdd
-import androidx.compose.material.icons.automirrored.filled.RotateRight
-import androidx.compose.material.icons.filled.Brush
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Draw
-import androidx.compose.material.icons.filled.FindReplace
-import androidx.compose.material.icons.filled.IosShare
+import androidx.compose.material.icons.automirrored.outlined.NoteAdd
+import androidx.compose.material.icons.automirrored.outlined.RotateRight
+import androidx.compose.material.icons.outlined.BorderColor
+import androidx.compose.material.icons.outlined.Brush
+import androidx.compose.material.icons.outlined.Create
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Draw
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.FileCopy
+import androidx.compose.material.icons.outlined.FindReplace
+import androidx.compose.material.icons.outlined.Gesture
+import androidx.compose.material.icons.outlined.HistoryEdu
+import androidx.compose.material.icons.outlined.IosShare
+import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -53,20 +58,32 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.papr.scanner.core.FileUtils
+import com.papr.scanner.domain.model.NormalizedPoint
+import com.papr.scanner.domain.model.Page
+import com.papr.scanner.domain.model.TextNote
 import com.papr.scanner.presentation.common.paprViewModel
+import com.papr.scanner.presentation.detail.components.EraserIcon
 import com.papr.scanner.presentation.detail.components.ExportOptionsSheet
+import com.papr.scanner.presentation.detail.components.MainToolbar
+import com.papr.scanner.presentation.detail.components.MarkupOptionsRow
 import com.papr.scanner.presentation.detail.components.PagePager
 import com.papr.scanner.presentation.detail.components.PageThumbnailStrip
 import com.papr.scanner.presentation.detail.components.SignatureOverlayEditor
+import com.papr.scanner.presentation.detail.components.SubToolbar
+import com.papr.scanner.presentation.detail.components.TextNoteDialog
+import com.papr.scanner.presentation.detail.components.ToolButton
+import com.papr.scanner.presentation.detail.markup.defaultStyle
+import com.papr.scanner.presentation.detail.markup.sizeFraction
 import com.papr.scanner.presentation.paywall.ProUpgradeSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -99,6 +116,7 @@ fun DocumentDetailScreen(
     var showSignatureEditor by remember { mutableStateOf(false) }
     var showExportOptions by remember { mutableStateOf(false) }
     var pendingDeletePage by remember { mutableStateOf(false) }
+    var textEdit by remember { mutableStateOf<TextEditRequest?>(null) }
     // Non-null while the Pro sheet is open: why it opened.
     var paywallReason by remember { mutableStateOf<String?>(null) }
 
@@ -130,7 +148,7 @@ fun DocumentDetailScreen(
         viewModel.proSheetRequests.collect { reason -> paywallReason = reason }
     }
 
-    val currentPage = uiState.pages.getOrNull(uiState.currentPageIndex)
+    val currentPage = uiState.currentPage
     val saveTitle = {
         if (titleDraft.text.isNotBlank()) {
             viewModel.updateTitle(titleDraft.text)
@@ -153,18 +171,35 @@ fun DocumentDetailScreen(
                             modifier = Modifier.focusRequester(titleFocus),
                         )
                     } else {
-                        Text(
-                            text = uiState.document?.title.orEmpty(),
-                            // One line, like the home grid: a long title would otherwise grow the bar and push the page down.
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.clickable {
-                                val title = uiState.document?.title.orEmpty()
-                                // All selected, so typing replaces it; arrow keys or a tap keep it.
-                                titleDraft = TextFieldValue(title, selection = TextRange(0, title.length))
-                                isEditingTitle = true
-                            },
-                        )
+                        // The pencil says the title can be renamed; tapping anywhere on it does that.
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable(onClickLabel = "Rename") {
+                                    val title = uiState.document?.title.orEmpty()
+                                    // All selected, so typing replaces it; arrow keys or a tap keep it.
+                                    titleDraft = TextFieldValue(title, selection = TextRange(0, title.length))
+                                    isEditingTitle = true
+                                }
+                                .padding(horizontal = 4.dp, vertical = 4.dp),
+                        ) {
+                            Text(
+                                text = uiState.document?.title.orEmpty(),
+                                // One line, like the home grid: a long title would otherwise grow the bar and push the page down.
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                            Icon(
+                                Icons.Outlined.Edit,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .padding(start = 8.dp)
+                                    .size(18.dp),
+                            )
+                        }
                     }
                 },
                 navigationIcon = {
@@ -178,13 +213,6 @@ fun DocumentDetailScreen(
                             onClick = saveTitle,
                             enabled = titleDraft.text.isNotBlank(),
                         ) { Text("Save") }
-                    } else {
-                        IconButton(onClick = onAddPagesClick, enabled = uiState.document != null) {
-                            Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Add pages")
-                        }
-                        IconButton(onClick = { showExportOptions = true }, enabled = uiState.pages.isNotEmpty()) {
-                            Icon(Icons.Filled.IosShare, contentDescription = "Export")
-                        }
                     }
                 },
             )
@@ -202,6 +230,9 @@ fun DocumentDetailScreen(
             return@Scaffold
         }
 
+        val inMarkup = uiState.mode == EditorMode.MARKUP
+        val toolStyle = uiState.toolStyles[uiState.markupTool]
+
         // The page and its tools as pieces, so landscape can lay them out side by side.
         val pageArea: @Composable ColumnScope.() -> Unit = {
             if (uiState.isExporting) {
@@ -213,117 +244,166 @@ fun DocumentDetailScreen(
                 revision = uiState.revision,
                 currentPageIndex = uiState.currentPageIndex,
                 onPageChanged = viewModel::selectPage,
-                isMarkingConfidential = uiState.isMarkingConfidential,
+                markupTool = uiState.markupTool.takeIf { inMarkup },
+                toolStyle = toolStyle,
                 isPlacingSignature = uiState.isPlacingSignature,
-                onMarkStrokeAdded = { page, stroke -> viewModel.addConfidentialMarkStroke(page.id, stroke) },
-                onMarkStrokeErased = { page, stroke -> viewModel.eraseConfidentialMarkStroke(page.id, stroke) },
-                onSignatureTap = { viewModel.setPlacingSignature(true) },
+                // Outside Markup, tapping a signature opens the Sign tools to move it.
+                onSignatureTap = { _: Page -> viewModel.openMode(EditorMode.SIGN) }.takeIf { !inMarkup },
                 onSignaturePlacementChange = { page, x, y, width -> viewModel.updateSignaturePlacement(page.id, x, y, width) },
                 onSignatureRemove = { page -> viewModel.removeSignature(page.id) },
+                onMarkStrokeAdded = { page, stroke -> viewModel.addConfidentialMarkStroke(page.id, stroke) },
+                onMarkStrokeErased = { page, stroke -> viewModel.eraseConfidentialMarkStroke(page.id, stroke) },
+                onStrokeDrawn = { page, stroke -> viewModel.addAnnotation(page.id, stroke) },
+                onErase = { page, annotations, marks -> viewModel.eraseMarkup(page.id, annotations, marks) },
+                onTextTap = { page, note, anchor -> textEdit = TextEditRequest(page.id, note, anchor) },
+                onTextMoved = { page, note, x, y -> viewModel.saveTextNote(page.id, note, note.copy(x = x, y = y)) },
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
             )
 
             when {
-                uiState.isMarkingConfidential -> HintRow(
-                    text = if (isPro) {
-                        "Drag to cover content, tap a mark to remove it. Covered text can still be found " +
-                            "by searching in Papr."
-                    } else {
-                        "Tap a mark to remove it. Adding marks needs Papr Pro."
-                    },
-                    onDone = viewModel::stopMarkingConfidential,
-                )
-                uiState.isPlacingSignature -> HintRow(
-                    text = "Drag the signature to move it. Drag its corner to resize.",
-                    onDone = { viewModel.setPlacingSignature(false) },
-                )
+                uiState.isPlacingSignature -> HintRow("Drag the signature to move it. Drag its corner to resize.")
+                uiState.mode == EditorMode.SIGN -> HintRow("Draw your signature, then drag it into place.")
+                inMarkup && uiState.markupTool == MarkupTool.TEXT ->
+                    HintRow("Tap to add text. Tap text to edit it, drag to move it.")
             }
 
-            PageThumbnailStrip(
-                pages = uiState.pages,
-                revision = uiState.revision,
-                currentPageIndex = uiState.currentPageIndex,
-                onPageSelected = viewModel::selectPage,
-            )
-        }
-        val pageActions: @Composable () -> Unit = {
-            IconButton(
-                onClick = { currentPage?.let { viewModel.movePage(it.id, -1) } },
-                enabled = currentPage != null && uiState.currentPageIndex > 0,
-            ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Move page earlier") }
-            IconButton(onClick = { currentPage?.let { viewModel.rotatePage(it.id) } }, enabled = currentPage != null) {
-                Icon(Icons.AutoMirrored.Filled.RotateRight, contentDescription = "Rotate page")
-            }
-            IconButton(onClick = { showSignatureEditor = true }, enabled = currentPage != null) {
-                Icon(
-                    Icons.Filled.Draw,
-                    contentDescription = "Sign page",
-                    tint = if (uiState.isPlacingSignature) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+            if (inMarkup) {
+                MarkupOptionsRow(
+                    tool = uiState.markupTool,
+                    style = toolStyle,
+                    hint = when (uiState.markupTool) {
+                        MarkupTool.ERASER -> "Drag across markup to erase it."
+                        MarkupTool.CONFIDENTIAL -> if (isPro) {
+                            "Drag to cover content, tap a mark to remove it. Papr's search still finds covered text."
+                        } else {
+                            "Tap a mark to remove it. Adding marks needs Papr Pro."
+                        }
+                        else -> null
+                    },
+                    canUndo = uiState.canUndo,
+                    canRedo = uiState.canRedo,
+                    onStyleChange = { style -> viewModel.setToolStyle(uiState.markupTool, style) },
+                    onUndo = viewModel::undoMarkup,
+                    onRedo = viewModel::redoMarkup,
+                )
+            } else {
+                // Hidden while marking up, so the page gets the room.
+                PageThumbnailStrip(
+                    pages = uiState.pages,
+                    revision = uiState.revision,
+                    currentPageIndex = uiState.currentPageIndex,
+                    onPageSelected = viewModel::selectPage,
                 )
             }
-            IconButton(
-                onClick = {
-                    if (uiState.isMarkingConfidential) {
-                        viewModel.stopMarkingConfidential()
-                    } else {
-                        viewModel.startMarkingConfidential(pageHasMarks = currentPage?.confidentialMarks?.isNotEmpty() == true)
+        }
+
+        val toolbar: @Composable (vertical: Boolean) -> Unit = { vertical ->
+            val hasPage = currentPage != null
+            when (uiState.mode) {
+                EditorMode.NONE -> MainToolbar(vertical) { weight ->
+                    ToolButton(Icons.Outlined.Gesture, "Markup", { viewModel.openMode(EditorMode.MARKUP) }, weight, enabled = hasPage)
+                    ToolButton(Icons.Outlined.HistoryEdu, "Sign", { viewModel.openMode(EditorMode.SIGN) }, weight, enabled = hasPage)
+                    ToolButton(Icons.Outlined.FileCopy, "Pages", { viewModel.openMode(EditorMode.PAGES) }, weight, enabled = hasPage)
+                    ToolButton(Icons.Outlined.IosShare, "Export", { showExportOptions = true }, weight, enabled = hasPage)
+                }
+                EditorMode.MARKUP -> SubToolbar(vertical, onDone = viewModel::closeMode) {
+                    val pick = { tool: MarkupTool ->
+                        viewModel.selectMarkupTool(tool, pageHasMarks = currentPage?.confidentialMarks?.isNotEmpty() == true)
                     }
-                },
-                enabled = currentPage != null,
-            ) {
-                Icon(
-                    Icons.Filled.Brush,
-                    contentDescription = "Mark confidential",
-                    tint = if (uiState.isMarkingConfidential) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                )
+                    val tool = uiState.markupTool
+                    ToolButton(Icons.Outlined.Create, "Pen", { pick(MarkupTool.PEN) }, selected = tool == MarkupTool.PEN)
+                    ToolButton(Icons.Outlined.BorderColor, "Highlighter", { pick(MarkupTool.HIGHLIGHTER) }, selected = tool == MarkupTool.HIGHLIGHTER)
+                    ToolButton(Icons.Outlined.TextFields, "Text", { pick(MarkupTool.TEXT) }, selected = tool == MarkupTool.TEXT)
+                    ToolButton(EraserIcon, "Eraser", { pick(MarkupTool.ERASER) }, selected = tool == MarkupTool.ERASER)
+                    ToolButton(
+                        Icons.Outlined.Brush,
+                        "Confidential",
+                        { pick(MarkupTool.CONFIDENTIAL) },
+                        selected = tool == MarkupTool.CONFIDENTIAL,
+                        locked = !isPro,
+                    )
+                }
+                EditorMode.SIGN -> SubToolbar(vertical, onDone = viewModel::closeMode) {
+                    ToolButton(Icons.Outlined.Draw, "Draw new", { showSignatureEditor = true }, enabled = hasPage)
+                    ToolButton(
+                        Icons.Outlined.Delete,
+                        "Remove",
+                        { currentPage?.let { viewModel.removeSignature(it.id) } },
+                        enabled = currentPage?.signature != null,
+                    )
+                }
+                EditorMode.PAGES -> SubToolbar(vertical, onDone = viewModel::closeMode) {
+                    ToolButton(Icons.AutoMirrored.Outlined.RotateRight, "Rotate", { currentPage?.let { viewModel.rotatePage(it.id) } }, enabled = hasPage)
+                    ToolButton(
+                        Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                        "Earlier",
+                        { currentPage?.let { viewModel.movePage(it.id, -1) } },
+                        enabled = hasPage && uiState.currentPageIndex > 0,
+                    )
+                    ToolButton(
+                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        "Later",
+                        { currentPage?.let { viewModel.movePage(it.id, 1) } },
+                        enabled = hasPage && uiState.currentPageIndex < uiState.pages.size - 1,
+                    )
+                    ToolButton(Icons.Outlined.FindReplace, "Replace", { currentPage?.let { onReplacePageClick(it.id) } }, enabled = hasPage)
+                    ToolButton(Icons.AutoMirrored.Outlined.NoteAdd, "Add", onAddPagesClick, enabled = uiState.document != null)
+                    ToolButton(Icons.Outlined.Delete, "Delete", { pendingDeletePage = true }, enabled = hasPage)
+                }
             }
-            IconButton(
-                onClick = { currentPage?.let { onReplacePageClick(it.id) } },
-                enabled = currentPage != null,
-            ) {
-                Icon(Icons.Filled.FindReplace, contentDescription = "Replace page")
-            }
-            IconButton(onClick = { pendingDeletePage = true }, enabled = currentPage != null) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete page")
-            }
-            IconButton(
-                onClick = { currentPage?.let { viewModel.movePage(it.id, 1) } },
-                enabled = currentPage != null && uiState.currentPageIndex < uiState.pages.size - 1,
-            ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Move page later") }
         }
+
+        // Back steps out of a group of tools before it leaves the document.
+        BackHandler(enabled = uiState.mode != EditorMode.NONE) { viewModel.closeMode() }
 
         BoxWithConstraints(modifier = Modifier.padding(innerPadding)) {
             if (maxWidth > maxHeight) {
                 // Landscape: the tools move to a rail on the right so the page gets the full height.
                 Row {
                     Column(modifier = Modifier.weight(1f), content = pageArea)
-                    Column(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 4.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.SpaceEvenly,
-                    ) { pageActions() }
+                    Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxHeight()) {
+                        Box(modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)) { toolbar(true) }
+                    }
                 }
             } else {
-                val screenWidth = maxWidth
                 Column {
                     pageArea()
-                    // Scrolls sideways when the seven buttons don't fit (narrow phones, or the
-                    // largest display size) instead of squashing the last ones; at least
-                    // screen-wide so they still spread out evenly when they do fit.
-                    Row(
-                        modifier = Modifier
-                            .horizontalScroll(rememberScrollState())
-                            .widthIn(min = screenWidth)
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                    ) { pageActions() }
+                    Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+                        Box(modifier = Modifier.padding(vertical = 4.dp)) { toolbar(false) }
+                    }
                 }
             }
         }
+    }
+
+    textEdit?.let { request ->
+        val existing = request.existing
+        TextNoteDialog(
+            initialText = existing?.text.orEmpty(),
+            onSave = { text ->
+                if (existing != null) {
+                    viewModel.saveTextNote(request.pageId, existing, existing.copy(text = text))
+                } else {
+                    val style = uiState.toolStyles[MarkupTool.TEXT] ?: MarkupTool.TEXT.defaultStyle()
+                    viewModel.saveTextNote(
+                        request.pageId,
+                        null,
+                        TextNote(
+                            text = text,
+                            x = request.anchor.x,
+                            y = request.anchor.y.coerceAtLeast(0f),
+                            color = style.color,
+                            size = MarkupTool.TEXT.sizeFraction(style.size),
+                        ),
+                    )
+                }
+                textEdit = null
+            },
+            onDelete = existing?.let { note -> { viewModel.saveTextNote(request.pageId, note, null); textEdit = null } },
+            onDismiss = { textEdit = null },
+        )
     }
 
     if (showSignatureEditor) {
@@ -377,21 +457,18 @@ fun DocumentDetailScreen(
     }
 }
 
-/** Explains the active editing mode, with a way out of it. */
+/** Explains how to use the active tool. */
 @Composable
-private fun HintRow(text: String, onDone: () -> Unit) {
-    Row(
+private fun HintRow(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
-        )
-        TextButton(onClick = onDone) { Text("Done") }
-    }
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+    )
 }
+
+/** A text note being added (no [existing]) at [anchor], or [existing] being edited. */
+private data class TextEditRequest(val pageId: Long, val existing: TextNote?, val anchor: NormalizedPoint)

@@ -1,6 +1,7 @@
 package com.papr.scanner.pdf
 
 import com.papr.scanner.domain.model.ConfidentialMarkStroke
+import com.papr.scanner.domain.model.InkStroke
 import com.papr.scanner.domain.model.NormalizedPoint
 import kotlin.math.sqrt
 
@@ -40,9 +41,24 @@ internal fun fittedImageBounds(
 }
 
 /** Whether [point] lies within [toleranceRadius] of any segment of [stroke], for tap-to-erase hit-testing. */
-internal fun isPointNearStroke(point: NormalizedPoint, stroke: ConfidentialMarkStroke, toleranceRadius: Float): Boolean {
-    if (stroke.points.size == 1) return distance(point, stroke.points[0]) <= toleranceRadius
-    return stroke.points.zipWithNext().any { (a, b) -> distanceToSegment(point, a, b) <= toleranceRadius }
+internal fun isPointNearStroke(point: NormalizedPoint, stroke: ConfidentialMarkStroke, toleranceRadius: Float): Boolean =
+    isPointNearPolyline(point, stroke.points, toleranceRadius)
+
+/**
+ * Whether the touch at ([xPx], [yPx]) lands on [stroke] drawn on a [widthPx]x[heightPx]
+ * page: within half its drawn width plus [slopPx] (room for a fingertip). Measured in
+ * pixels, so a tall page doesn't make lines easier to hit sideways than up and down.
+ */
+internal fun isOnInkStroke(stroke: InkStroke, xPx: Float, yPx: Float, widthPx: Int, heightPx: Int, slopPx: Float): Boolean {
+    val pixelPoints = stroke.points.map { NormalizedPoint(it.x * widthPx, it.y * heightPx) }
+    val halfWidth = stroke.width * minOf(widthPx, heightPx) / 2f
+    return isPointNearPolyline(NormalizedPoint(xPx, yPx), pixelPoints, halfWidth + slopPx)
+}
+
+private fun isPointNearPolyline(point: NormalizedPoint, points: List<NormalizedPoint>, toleranceRadius: Float): Boolean {
+    if (points.isEmpty()) return false
+    if (points.size == 1) return distance(point, points[0]) <= toleranceRadius
+    return points.zipWithNext().any { (a, b) -> distanceToSegment(point, a, b) <= toleranceRadius }
 }
 
 private fun distance(a: NormalizedPoint, b: NormalizedPoint): Float {

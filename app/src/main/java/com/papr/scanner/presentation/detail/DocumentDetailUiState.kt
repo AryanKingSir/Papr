@@ -2,6 +2,7 @@ package com.papr.scanner.presentation.detail
 
 import com.papr.scanner.domain.model.Document
 import com.papr.scanner.domain.model.Page
+import com.papr.scanner.presentation.detail.markup.ToolStyle
 
 data class DocumentDetailUiState(
     val document: Document? = null,
@@ -18,9 +19,23 @@ data class DocumentDetailUiState(
     // without this the UI would silently miss the update until something
     // else happens to also change a real field.
     val revision: Int = 0,
-    val isMarkingConfidential: Boolean = false,
-    val isPlacingSignature: Boolean = false,
-)
+    val mode: EditorMode = EditorMode.NONE,
+    val markupTool: MarkupTool = MarkupTool.PEN,
+    val toolStyles: Map<MarkupTool, ToolStyle> = emptyMap(),
+    val canUndo: Boolean = false,
+    val canRedo: Boolean = false,
+) {
+    val currentPage: Page? get() = pages.getOrNull(currentPageIndex)
+    val isMarkingConfidential: Boolean get() = mode == EditorMode.MARKUP && markupTool == MarkupTool.CONFIDENTIAL
+
+    /** In Sign mode the current page's signature is always movable - there's nothing else to do with it there. */
+    val isPlacingSignature: Boolean get() = mode == EditorMode.SIGN && currentPage?.signature != null
+}
+
+/** Which group of tools the bottom bar is showing. NONE is the main bar of groups. */
+enum class EditorMode { NONE, MARKUP, SIGN, PAGES }
+
+enum class MarkupTool { PEN, HIGHLIGHTER, TEXT, ERASER, CONFIDENTIAL }
 
 data class ExportSettings(
     val ocrEnabled: Boolean = false,

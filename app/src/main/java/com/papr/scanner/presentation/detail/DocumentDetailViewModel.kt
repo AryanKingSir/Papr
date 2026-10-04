@@ -10,6 +10,8 @@ import com.papr.scanner.data.repository.DocumentDeleter
 import com.papr.scanner.data.repository.DocumentRepository
 import com.papr.scanner.domain.model.ConfidentialMarkStroke
 import com.papr.scanner.domain.model.Page
+import com.papr.scanner.domain.model.PageAnnotation
+import com.papr.scanner.domain.model.TextNote
 import com.papr.scanner.domain.model.clampedTo
 import com.papr.scanner.domain.model.defaultSignaturePlacement
 import com.papr.scanner.domain.model.rotatedClockwise
@@ -17,6 +19,11 @@ import com.papr.scanner.pdf.PasswordProtection
 import com.papr.scanner.pdf.PdfEngine
 import com.papr.scanner.pdf.PdfGenerationOptions
 import com.papr.scanner.pdf.overlays
+import com.papr.scanner.presentation.detail.markup.MarkupEdit
+import com.papr.scanner.presentation.detail.markup.MarkupHistory
+import com.papr.scanner.presentation.detail.markup.MarkupSnapshot
+import com.papr.scanner.presentation.detail.markup.ToolStyle
+import com.papr.scanner.presentation.detail.markup.defaultStyle
 import com.papr.scanner.pdf.TextRecognitionUnavailableException
 import com.papr.scanner.usage.Allowance
 import com.papr.scanner.usage.MeteredFeature
@@ -55,8 +62,12 @@ class DocumentDetailViewModel(
         val isExporting: Boolean = false,
         val isDeleted: Boolean = false,
         val revision: Int = 0,
-        val isMarkingConfidential: Boolean = false,
-        val isPlacingSignature: Boolean = false,
+        val mode: EditorMode = EditorMode.NONE,
+        val markupTool: MarkupTool = MarkupTool.PEN,
+        val toolStyles: Map<MarkupTool, ToolStyle> = listOf(MarkupTool.PEN, MarkupTool.HIGHLIGHTER, MarkupTool.TEXT)
+            .associateWith { it.defaultStyle() },
+        val canUndo: Boolean = false,
+        val canRedo: Boolean = false,
     )
 
     private val localState = MutableStateFlow(LocalState())
@@ -67,6 +78,8 @@ class DocumentDetailViewModel(
     // rather than trusting the Page the UI handed over, which may predate an
     // edit that was still queued (e.g. two quick mark strokes).
     private val fileMutex = Mutex()
+
+    private val markupHistory = MarkupHistory()
 
     val uiState: StateFlow<DocumentDetailUiState> = combine(
         documentRepository.getDocumentById(documentId),
@@ -82,8 +95,11 @@ class DocumentDetailViewModel(
             isExporting = local.isExporting,
             isDeleted = local.isDeleted,
             revision = local.revision,
-            isMarkingConfidential = local.isMarkingConfidential,
-            isPlacingSignature = local.isPlacingSignature,
+            mode = local.mode,
+            markupTool = local.markupTool,
+            toolStyles = local.toolStyles,
+            canUndo = local.canUndo,
+            canRedo = local.canRedo,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DocumentDetailUiState())
 
@@ -103,9 +119,34 @@ class DocumentDetailViewModel(
     val proSheetRequests: SharedFlow<String> = _proSheetRequests.asSharedFlow()
 
     fun selectPage(index: Int) {
+        localState.update { it.copy(currentPageIndex = index) }
+    }
+
+    /** Swaps the bottom bar to a group of tools (or back to the groups, with NONE). */
+    fun openMode(mode: EditorMode) {
+        // Undo covers one Markup session: leaving Markup ends it.
+        if (mode != EditorMode.MARKUP) markupHistory.clear()
         localState.update {
-            // Signature placement belongs to one page; switching pages ends it.
-            if (index == it.currentPageIndex) it else it.copy(currentPageIndex = index, isPlacingSignature = false)
+            // Confidential is only kept while it's in use: reopening Markup starts on a free tool.
+            val tool = if (mode == EditorMode.MARKUP && it.markupTool == MarkupTool.CONFIDENTIAL) MarkupTool.PEN else it.markupTool
+            it.copy(mode = mode, markupTool = tool, canUndo = markupHistory.canUndo, canRedo = markupHistory.canRedo)
+        }
+    }
+
+    fun closeMode() = openMode(EditorMode.NONE)
+
+    /**
+     * Adding confidential marks needs Pro, but a free user can still pick the
+     * tool on a page that already has marks (made before Pro was needed, or
+     * carried in by a merge) to remove them.
+     */
+    fun selectMarkupTool(tool: MarkupTool, pageHasMarks: Boolean) {
+        viewModelScope.launch {
+            if (tool != MarkupTool.CONFIDENTIAL || pageHasMarks || usageTracker.isPro.first()) {
+                localState.update { it.copy(markupTool = tool) }
+            } else {
+                _proSheetRequests.emit(MARKS_NEED_PRO)
+            }
         }
     }
 
@@ -191,23 +232,34 @@ class DocumentDetailViewModel(
         }
     }
 
-    /**
-     * Adding marks needs Pro, but a free user can still enter marking mode on a
-     * page that already has marks (made before Pro was needed, or carried in by
-     * a merge) to remove them.
-     */
-    fun startMarkingConfidential(pageHasMarks: Boolean) {
-        viewModelScope.launch {
-            if (pageHasMarks || usageTracker.isPro.first()) {
-                localState.update { it.copy(isMarkingConfidential = true, isPlacingSignature = false) }
-            } else {
-                _proSheetRequests.emit(MARKS_NEED_PRO)
-            }
+    fun setToolStyle(tool: MarkupTool, style: ToolStyle) {
+        localState.update { it.copy(toolStyles = it.toolStyles + (tool to style)) }
+    }
+
+    fun addAnnotation(pageId: Long, annotation: PageAnnotation) {
+        editMarkup(pageId, "Couldn't save the markup") { page -> page.copy(annotations = page.annotations + annotation) }
+    }
+
+    /** Removes what one eraser gesture passed over, as a single undo step. */
+    fun eraseMarkup(pageId: Long, annotations: List<PageAnnotation>, marks: List<ConfidentialMarkStroke>) {
+        editMarkup(pageId, "Couldn't erase the markup") { page ->
+            page.copy(
+                annotations = page.annotations - annotations.toSet(),
+                confidentialMarks = page.confidentialMarks - marks.toSet(),
+            )
         }
     }
 
-    fun stopMarkingConfidential() {
-        localState.update { it.copy(isMarkingConfidential = false) }
+    /** Adds [updated] (when [existing] is null), replaces [existing] with it, or deletes [existing] (when [updated] is null). */
+    fun saveTextNote(pageId: Long, existing: TextNote?, updated: TextNote?) {
+        editMarkup(pageId, "Couldn't save the text") { page ->
+            val annotations = when {
+                existing == null -> page.annotations + listOfNotNull(updated)
+                updated == null -> page.annotations - existing
+                else -> page.annotations.map { if (it == existing) updated else it }
+            }
+            page.copy(annotations = annotations)
+        }
     }
 
     fun addConfidentialMarkStroke(pageId: Long, stroke: ConfidentialMarkStroke) {
@@ -216,19 +268,30 @@ class DocumentDetailViewModel(
                 _proSheetRequests.emit(MARKS_NEED_PRO)
                 return@launch
             }
-            updatePage(pageId, "Couldn't add the mark") { page ->
+            editMarkup(pageId, "Couldn't add the mark") { page ->
                 page.copy(confidentialMarks = page.confidentialMarks + stroke)
             }
         }
     }
 
     fun eraseConfidentialMarkStroke(pageId: Long, stroke: ConfidentialMarkStroke) {
-        updatePage(pageId, "Couldn't remove the mark") { page ->
+        editMarkup(pageId, "Couldn't remove the mark") { page ->
             page.copy(confidentialMarks = page.confidentialMarks - stroke)
         }
     }
 
-    /** Saves a freshly drawn signature onto the page (replacing any existing one) and starts placing it. */
+    // Undoing never needs Pro: it only puts back what the page had a moment ago.
+    fun undoMarkup() {
+        markupHistory.undo()?.let { writeMarkup(it.pageId, it.before, "Couldn't undo") }
+        publishHistory()
+    }
+
+    fun redoMarkup() {
+        markupHistory.redo()?.let { writeMarkup(it.pageId, it.after, "Couldn't redo") }
+        publishHistory()
+    }
+
+    /** Saves a freshly drawn signature onto the page (replacing any existing one), ready to place in Sign mode. */
     fun setSignature(pageId: Long, signatureBitmap: Bitmap) {
         launchEdit("Couldn't add the signature") {
             try {
@@ -248,7 +311,7 @@ class DocumentDetailViewModel(
                 page.signature?.let { old -> withContext(Dispatchers.IO) { File(old.imagePath).delete() } }
                 refreshThumbnailIfFirst(updated)
                 touchDocument()
-                localState.update { it.copy(isPlacingSignature = true, isMarkingConfidential = false) }
+                localState.update { it.copy(mode = EditorMode.SIGN) }
             } finally {
                 signatureBitmap.recycle()
             }
@@ -277,13 +340,6 @@ class DocumentDetailViewModel(
             withContext(Dispatchers.IO) { File(signature.imagePath).delete() }
             refreshThumbnailIfFirst(updated)
             touchDocument()
-            localState.update { it.copy(isPlacingSignature = false) }
-        }
-    }
-
-    fun setPlacingSignature(placing: Boolean) {
-        localState.update {
-            it.copy(isPlacingSignature = placing, isMarkingConfidential = it.isMarkingConfidential && !placing)
         }
     }
 
@@ -367,16 +423,42 @@ class DocumentDetailViewModel(
         }
     }
 
+    /** Like [updatePage], and records the change so it can be undone. */
+    private fun editMarkup(pageId: Long, errorMessage: String, transform: (Page) -> Page) {
+        launchEdit(errorMessage) {
+            val page = documentRepository.getPage(pageId) ?: return@launchEdit
+            val updated = transform(page)
+            if (updated == page) return@launchEdit
+            savePage(updated)
+            markupHistory.record(MarkupEdit(pageId, page.markupSnapshot(), updated.markupSnapshot()))
+            publishHistory()
+        }
+    }
+
+    private fun writeMarkup(pageId: Long, snapshot: MarkupSnapshot, errorMessage: String) {
+        updatePage(pageId, errorMessage) { page ->
+            page.copy(annotations = snapshot.annotations, confidentialMarks = snapshot.confidentialMarks)
+        }
+    }
+
+    private fun publishHistory() {
+        localState.update { it.copy(canUndo = markupHistory.canUndo, canRedo = markupHistory.canRedo) }
+    }
+
     /** Applies [transform] to the page's current row and saves it, keeping the home thumbnail in sync. */
     private fun updatePage(pageId: Long, errorMessage: String, transform: (Page) -> Page) {
         launchEdit(errorMessage) {
             val page = documentRepository.getPage(pageId) ?: return@launchEdit
             val updated = transform(page)
             if (updated == page) return@launchEdit
-            documentRepository.updatePage(updated)
-            refreshThumbnailIfFirst(updated)
-            touchDocument()
+            savePage(updated)
         }
+    }
+
+    private suspend fun savePage(page: Page) {
+        documentRepository.updatePage(page)
+        refreshThumbnailIfFirst(page)
+        touchDocument()
     }
 
     private suspend fun refreshThumbnailIfFirst(page: Page) {
@@ -401,3 +483,5 @@ internal fun meteredFeaturesFor(settings: ExportSettings): Set<MeteredFeature> =
     if (settings.passwordEnabled && settings.password.isNotBlank()) add(MeteredFeature.PASSWORD_EXPORT)
     if (settings.compressToTargetSize) add(MeteredFeature.COMPRESSED_EXPORT)
 }
+
+private fun Page.markupSnapshot() = MarkupSnapshot(annotations, confidentialMarks)

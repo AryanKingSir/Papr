@@ -15,7 +15,7 @@ mlkitTextRecognition = "19.0.1"
 coroutines = "1.11.0"
 coilCompose = "3.6.3"
 junit = "4.13.2"
-orgJson = "20250517"
+orgJson = "20260814"
 reorderable = "3.1.0"
 
 [libraries]
