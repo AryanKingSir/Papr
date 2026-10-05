@@ -34,6 +34,8 @@ class RealPlayBillingClient(context: Context) : PlayBillingClient {
     private val client: BillingClient = BillingClient.newBuilder(context)
         .setListener(purchasesUpdatedListener)
         .enablePendingPurchases(PendingPurchasesParams.newBuilder().enableOneTimeProducts().build())
+        // Re-establishes a dropped connection on the next call, instead of that call failing.
+        .enableAutoServiceReconnection()
         .build()
 
     override suspend fun connect(): Boolean = suspendCancellableCoroutine { continuation ->
@@ -45,8 +47,8 @@ class RealPlayBillingClient(context: Context) : PlayBillingClient {
             }
 
             override fun onBillingServiceDisconnected() {
-                // BillingManager re-initiates connect() itself; nothing to resume if this
-                // fires after setup already completed one way or the other.
+                // Auto service reconnection restores the connection on the next call; nothing
+                // to resume if this fires after setup already completed one way or the other.
             }
         })
     }
@@ -70,15 +72,17 @@ class RealPlayBillingClient(context: Context) : PlayBillingClient {
         return BillingProduct(productId = productId, formattedPrice = price)
     }
 
-    override suspend fun queryOwnedPurchases(): List<BillingPurchase> {
+    override suspend fun queryOwnedPurchases(): List<BillingPurchase>? {
         val params = QueryPurchasesParams.newBuilder()
             .setProductType(BillingClient.ProductType.INAPP)
             .build()
 
-        val purchases = suspendCancellableCoroutine<List<Purchase>> { continuation ->
-            client.queryPurchasesAsync(params) { _, purchases -> continuation.resume(purchases) }
+        val purchases = suspendCancellableCoroutine<List<Purchase>?> { continuation ->
+            client.queryPurchasesAsync(params) { billingResult, purchases ->
+                continuation.resume(purchases.takeIf { billingResult.responseCode == BillingClient.BillingResponseCode.OK })
+            }
         }
-        return purchases.flatMap { it.toBillingPurchases() }
+        return purchases?.flatMap { it.toBillingPurchases() }
     }
 
     override suspend fun acknowledgePurchase(purchaseToken: String): Boolean {

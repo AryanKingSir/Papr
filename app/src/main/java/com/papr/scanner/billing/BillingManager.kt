@@ -30,7 +30,8 @@ sealed interface BillingState {
  * trying again. Startup reconciliation (an already-owned purchase found on
  * connect) is a silent side effect on isProUnlocked, not its own state:
  * it persists entitlement for a reinstall/new-device case with no purchase
- * event to celebrate, and connect() always settles in Ready afterward.
+ * event to celebrate, removes it once Play confirms the purchase is gone
+ * (refunded), and connect() always settles in Ready afterward.
  */
 class BillingManager(
     private val playBillingClient: PlayBillingClient,
@@ -96,9 +97,14 @@ class BillingManager(
     }
 
     private suspend fun reconcileOwnedPurchases() {
-        playBillingClient.queryOwnedPurchases()
-            .firstOrNull { it.productId == productId && it.state == BillingPurchaseState.PURCHASED }
-            ?.let { acknowledgeAndPersist(it) }
+        // null = Play didn't answer; never take Pro away on that.
+        val owned = playBillingClient.queryOwnedPurchases()?.filter { it.productId == productId } ?: return
+        val purchased = owned.firstOrNull { it.state == BillingPurchaseState.PURCHASED }
+        when {
+            purchased != null -> acknowledgeAndPersist(purchased)
+            // Play answered and the purchase is gone (refunded or revoked).
+            owned.isEmpty() -> userPreferencesRepository.setProUnlocked(false)
+        }
     }
 
     private suspend fun acknowledgeAndPersist(purchase: BillingPurchase): Boolean {

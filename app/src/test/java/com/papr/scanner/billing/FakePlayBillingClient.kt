@@ -9,7 +9,8 @@ class FakePlayBillingClient : PlayBillingClient {
 
     var connectResult: Boolean = true
     var product: BillingProduct? = null
-    var ownedPurchases: List<BillingPurchase> = emptyList()
+    /** null = Play didn't answer the query (offline, error). */
+    var ownedPurchases: List<BillingPurchase>? = emptyList()
     var acknowledgeResult: Boolean = true
     var queryProductError: Exception? = null
 
@@ -31,7 +32,7 @@ class FakePlayBillingClient : PlayBillingClient {
         return product
     }
 
-    override suspend fun queryOwnedPurchases(): List<BillingPurchase> = ownedPurchases
+    override suspend fun queryOwnedPurchases(): List<BillingPurchase>? = ownedPurchases
 
     override suspend fun acknowledgePurchase(purchaseToken: String): Boolean = acknowledgeResult
 

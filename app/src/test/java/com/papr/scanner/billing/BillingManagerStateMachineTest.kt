@@ -137,6 +137,60 @@ class BillingManagerStateMachineTest {
     }
 
     @Test
+    fun `startup reconciliation removes Pro when Play confirms the purchase is gone`() = runTest {
+        val client = FakePlayBillingClient().apply {
+            product = BillingProduct(productId, "$4.99")
+            ownedPurchases = emptyList()
+        }
+        val scope = newManagerScope()
+        val preferences = newUserPreferencesRepository(scope)
+        preferences.setProUnlocked(true)
+        val manager = BillingManager(client, preferences, productId, scope = scope)
+        advanceUntilIdle()
+
+        manager.connect()
+        advanceUntilIdle()
+
+        assertEquals(false, manager.isProUnlocked.value)
+    }
+
+    @Test
+    fun `startup reconciliation keeps Pro when Play doesn't answer the purchase query`() = runTest {
+        val client = FakePlayBillingClient().apply {
+            product = BillingProduct(productId, "$4.99")
+            ownedPurchases = null
+        }
+        val scope = newManagerScope()
+        val preferences = newUserPreferencesRepository(scope)
+        preferences.setProUnlocked(true)
+        val manager = BillingManager(client, preferences, productId, scope = scope)
+        advanceUntilIdle()
+
+        manager.connect()
+        advanceUntilIdle()
+
+        assertTrue(manager.isProUnlocked.value)
+    }
+
+    @Test
+    fun `startup reconciliation keeps Pro while a purchase of it is pending`() = runTest {
+        val client = FakePlayBillingClient().apply {
+            product = BillingProduct(productId, "$4.99")
+            ownedPurchases = listOf(BillingPurchase(productId, "token-3", BillingPurchaseState.PENDING, isAcknowledged = false))
+        }
+        val scope = newManagerScope()
+        val preferences = newUserPreferencesRepository(scope)
+        preferences.setProUnlocked(true)
+        val manager = BillingManager(client, preferences, productId, scope = scope)
+        advanceUntilIdle()
+
+        manager.connect()
+        advanceUntilIdle()
+
+        assertTrue(manager.isProUnlocked.value)
+    }
+
+    @Test
     fun `a failure while connecting settles into Disconnected instead of hanging in Connecting`() = runTest {
         val client = FakePlayBillingClient().apply { queryProductError = IllegalStateException("Play Store unavailable") }
         val scope = newManagerScope()

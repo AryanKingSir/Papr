@@ -33,7 +33,8 @@ interface PlayBillingClient {
 
     suspend fun queryProduct(productId: String): BillingProduct?
 
-    suspend fun queryOwnedPurchases(): List<BillingPurchase>
+    /** null when Play didn't answer (offline, error) - which must never be read as "owns nothing". */
+    suspend fun queryOwnedPurchases(): List<BillingPurchase>?
 
     suspend fun acknowledgePurchase(purchaseToken: String): Boolean
 
