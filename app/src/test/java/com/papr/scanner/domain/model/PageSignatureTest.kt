@@ -47,6 +47,23 @@ class PageSignatureTest {
     }
 
     @Test
+    fun `a signature too tall to fit at the minimum width still fits the page`() {
+        // A narrow vertical signature (10x taller than wide) on a landscape page: even the
+        // minimum width would make it taller than the page.
+        val result = signature(x = 0f, y = 0f, width = 0.2f, aspectRatio = 10f).clampedTo(pageAspect = 1.414f)
+
+        assertEquals(1f, result.heightFraction(1.414f), 0.0001f)
+        assertTrue(result.x + result.width <= 1f && result.y >= 0f)
+    }
+
+    @Test
+    fun `rotating a tall narrow signature onto a landscape page doesn't throw`() {
+        val result = signature(width = 0.1f, aspectRatio = 10f).clampedTo(0.707f).rotatedClockwise(newPageAspect = 1.414f)
+
+        assertTrue(result.heightFraction(1.414f) <= 1.0001f)
+    }
+
+    @Test
     fun `rotating clockwise on a square page keeps the width and turns a centered signature in place`() {
         val original = PageSignature("s.png", x = 0.4f, y = 0.45f, width = 0.2f, aspectRatio = 0.5f)
 

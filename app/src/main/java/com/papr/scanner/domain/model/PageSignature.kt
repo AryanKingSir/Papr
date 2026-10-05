@@ -24,8 +24,10 @@ fun PageSignature.heightFraction(pageAspect: Float): Float = width * aspectRatio
 
 /** Keeps the signature a usable size and fully on the page. */
 fun PageSignature.clampedTo(pageAspect: Float): PageSignature {
-    val maxWidthForHeight = 1f / (aspectRatio * pageAspect)
-    val sized = copy(width = width.coerceIn(MIN_SIGNATURE_WIDTH, minOf(1f, maxWidthForHeight)))
+    val maxWidth = minOf(1f, 1f / (aspectRatio * pageAspect))
+    // A very tall, narrow signature can't reach the minimum width without overflowing the page
+    // height; fitting the page wins then.
+    val sized = copy(width = width.coerceIn(minOf(MIN_SIGNATURE_WIDTH, maxWidth), maxWidth))
     return sized.copy(
         x = x.coerceIn(0f, 1f - sized.width),
         y = y.coerceIn(0f, (1f - sized.heightFraction(pageAspect)).coerceAtLeast(0f)),
