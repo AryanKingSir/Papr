@@ -2,6 +2,8 @@ package com.papr.scanner.pdf.security
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -23,6 +25,23 @@ class StandardSecurityHandlerTest {
     // StandardSecurityHandler.computeUserValue); the qpdf fixture's trailing
     // bytes are its own implementation-specific padding choice, not ours.
     private val expectedUserValuePrefix = hexToBytes("0c6848325a257c28682c78f27b5b3499")
+
+    @Test
+    fun `passwords made of standard keyboard characters are supported`() {
+        assertTrue(StandardSecurityHandler.isSupportedPassword("Secret 12!#~"))
+    }
+
+    @Test
+    fun `passwords with characters readers encode differently are not supported`() {
+        assertFalse(StandardSecurityHandler.isSupportedPassword("\u20B91234")) // rupee sign
+        assertFalse(StandardSecurityHandler.isSupportedPassword("p\u00E4ss")) // a-umlaut
+        assertFalse(StandardSecurityHandler.isSupportedPassword("\u0928\u092E")) // Devanagari
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `an unsupported password is refused rather than silently changed`() {
+        handler.computeOwnerValue(ownerPassword = "", userPassword = "\u20B91234")
+    }
 
     @Test
     fun `computes owner value matching qpdf reference`() {

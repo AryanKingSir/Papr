@@ -67,6 +67,8 @@ class StandardSecurityHandler {
     private fun xorKey(key: ByteArray, round: Int): ByteArray = ByteArray(key.size) { (key[it].toInt() xor round).toByte() }
 
     private fun pad(password: String): ByteArray {
+        // Encoding anything else would quietly turn it into '?', locking the user out of their own PDF.
+        require(isSupportedPassword(password)) { "Unsupported password characters" }
         val bytes = password.toByteArray(Charsets.ISO_8859_1)
         val truncated = bytes.copyOf(minOf(bytes.size, 32))
         return truncated + PADDING.copyOf(32 - truncated.size)
@@ -76,6 +78,12 @@ class StandardSecurityHandler {
 
     companion object {
         const val KEY_LENGTH = 16
+
+        /**
+         * Printable ASCII only. PDF readers turn other characters into password bytes in
+         * different ways, so a password using them may never open the file.
+         */
+        fun isSupportedPassword(password: String): Boolean = password.all { it in ' '..'~' }
 
         val PADDING = byteArrayOf(
             0x28, 0xBF.toByte(), 0x4E, 0x5E, 0x4E, 0x75, 0x8A.toByte(), 0x41,

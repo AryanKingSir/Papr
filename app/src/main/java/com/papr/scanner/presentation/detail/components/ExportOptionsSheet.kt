@@ -37,6 +37,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.papr.scanner.domain.model.ExportFormat
+import com.papr.scanner.pdf.security.StandardSecurityHandler
 import com.papr.scanner.presentation.detail.ExportSettings
 import com.papr.scanner.usage.Allowance
 import com.papr.scanner.usage.MeteredFeature
@@ -59,6 +60,7 @@ fun ExportOptionsSheet(
     var targetSizeMb by remember { mutableFloatStateOf(1f) }
     var passwordEnabled by remember { mutableStateOf(false) }
     var password by remember { mutableStateOf("") }
+    val passwordSupported = StandardSecurityHandler.isSupportedPassword(password)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         // Scrolls so Export stays reachable when the options don't fit: landscape,
@@ -129,6 +131,12 @@ fun ExportOptionsSheet(
                         value = password,
                         onValueChange = { password = it },
                         label = { Text("Password") },
+                        isError = !passwordSupported,
+                        supportingText = if (passwordSupported) {
+                            null
+                        } else {
+                            { Text("Use only letters, numbers and symbols from a standard keyboard, so every PDF reader can open it.") }
+                        },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -153,7 +161,8 @@ fun ExportOptionsSheet(
                     )
                 },
                 // Disabled mid-export so a second tap can't queue a duplicate export.
-                enabled = !isExporting && (format == ExportFormat.IMAGES || !passwordEnabled || password.isNotBlank()),
+                enabled = !isExporting &&
+                    (format == ExportFormat.IMAGES || !passwordEnabled || (password.isNotBlank() && passwordSupported)),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 12.dp, bottom = 24.dp),
