@@ -35,6 +35,7 @@ import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -488,11 +489,15 @@ class DocumentDetailViewModel(
         }
     }
 
-    /** Runs [edit] under [fileMutex], reporting any failure as [errorMessage] instead of crashing. */
+    /**
+     * Runs [edit] under [fileMutex], reporting any failure as [errorMessage] instead of crashing.
+     * An edit always finishes once asked for, even if the screen closes meanwhile: cancelled
+     * halfway, a rotation could turn the image but not the confidential marks over it.
+     */
     private fun launchEdit(errorMessage: String, edit: suspend () -> Unit) {
         viewModelScope.launch {
             try {
-                fileMutex.withLock { edit() }
+                withContext(NonCancellable) { fileMutex.withLock { edit() } }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
