@@ -53,7 +53,8 @@ fun ExportOptionsSheet(
     onLockedOptionTap: (MeteredFeature) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState()
+    // Fully open from the start: half open, turning on a password pushed Export below the screen's edge.
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var format by remember { mutableStateOf(initialFormat) }
     var ocrEnabled by remember { mutableStateOf(false) }
     var compressEnabled by remember { mutableStateOf(false) }
