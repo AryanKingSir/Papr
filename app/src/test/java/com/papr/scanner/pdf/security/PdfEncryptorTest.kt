@@ -1,6 +1,7 @@
 package com.papr.scanner.pdf.security
 
 import java.nio.charset.Charset
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Rule
@@ -69,6 +70,24 @@ class PdfEncryptorTest {
         val decrypted = Rc4Cipher.crypt(objectKey, bytes.copyOfRange(range.start, range.end))
 
         assertEquals(streamPayload, String(decrypted, latin1))
+    }
+
+    @Test
+    fun `the xref entry uses ASCII digits whatever the phone's language`() {
+        val file = tempFolder.newFile("arabic.pdf")
+        file.writeBytes(fixturePdf("BT ET").toByteArray(latin1))
+        val previous = Locale.getDefault()
+        try {
+            // Arabic formats numbers with Arabic-Indic digits by default.
+            Locale.setDefault(Locale.forLanguageTag("ar-EG"))
+            PdfEncryptor().encrypt(file, userPassword = "secret")
+        } finally {
+            Locale.setDefault(previous)
+        }
+
+        val text = String(file.readBytes(), latin1)
+        val offset = requireMatch(Regex("xref\\n6 1\\n(\\d{10}) 00000 n"), text).toInt()
+        assertEquals(text.lastIndexOf("6 0 obj"), offset)
     }
 
     private fun requireMatch(regex: Regex, text: String): String =

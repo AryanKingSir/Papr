@@ -3,6 +3,7 @@ package com.papr.scanner.pdf.security
 import java.io.File
 import java.nio.charset.Charset
 import java.security.SecureRandom
+import java.util.Locale
 
 /**
  * Password-protects an already-written PDF (RC4, Revision 3 / 128-bit,
@@ -52,7 +53,8 @@ class PdfEncryptor(
         val objectOffset = encrypted.size.toLong()
         val xrefOffset = objectOffset + appendedObject.size
 
-        val xref = "xref\n$encryptObjNum 1\n${"%010d 00000 n \n".format(objectOffset)}"
+        // Locale.ROOT: the default locale can format digits in another script (Arabic, for one).
+        val xref = "xref\n$encryptObjNum 1\n${String.format(Locale.ROOT, "%010d 00000 n \n", objectOffset)}"
         val newTrailer = "trailer\n<</Size ${encryptObjNum + 1}\n/Root $rootRef" +
             "\n/Encrypt $encryptObjNum 0 R\n/ID [<$idHex> <$idHex>]\n/Prev $startxref>>" +
             "\nstartxref\n$xrefOffset\n%%EOF\n"
@@ -60,7 +62,7 @@ class PdfEncryptor(
         pdfFile.writeBytes(encrypted + appendedObject + xref.toByteArray(latin1) + newTrailer.toByteArray(latin1))
     }
 
-    private fun ByteArray.toPdfHex(): String = joinToString("") { "%02X".format(it) }
+    private fun ByteArray.toPdfHex(): String = joinToString("") { String.format(Locale.ROOT, "%02X", it) }
 
     private fun lastMatch(regex: Regex, text: String) = regex.findAll(text).lastOrNull()
 
