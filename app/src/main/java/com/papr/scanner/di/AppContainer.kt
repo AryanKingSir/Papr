@@ -2,6 +2,8 @@ package com.papr.scanner.di
 
 import android.content.Context
 import android.util.Log
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
 import com.papr.scanner.billing.BillingManager
@@ -33,7 +35,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
-private val Context.userPreferencesDataStore by preferencesDataStore(name = "user_prefs")
+// An unreadable file (a bad restore, a torn write) starts over from defaults rather than crashing
+// every launch. Pro comes back on the next Play check.
+private val Context.userPreferencesDataStore by preferencesDataStore(
+    name = "user_prefs",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
 
 class AppContainer(private val context: Context) {
 
