@@ -66,9 +66,17 @@ object FileUtils {
         ) ?: throw IOException("Failed to decode bitmap: ${file.absolutePath}")
         val matrix = Matrix().apply { postRotate(degrees) }
         val rotated = Bitmap.createBitmap(original, 0, 0, original.width, original.height, matrix, true)
-        file.outputStream().use { rotated.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it) }
-        rotated.recycle()
-        if (rotated !== original) original.recycle()
+        // Written beside the page and renamed over it: the page is its only copy, so a full disk
+        // or the app being killed mid-write must never leave half an image behind.
+        val temp = File(file.parentFile, "${file.name}.tmp")
+        try {
+            val written = temp.outputStream().use { rotated.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it) }
+            if (!written || !temp.renameTo(file)) throw IOException("Failed to save rotated image: ${file.absolutePath}")
+        } finally {
+            temp.delete()
+            rotated.recycle()
+            if (rotated !== original) original.recycle()
+        }
     }
 
     /**
