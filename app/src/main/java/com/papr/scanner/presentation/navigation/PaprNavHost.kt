@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -27,23 +28,23 @@ fun PaprNavHost(
     modifier: Modifier = Modifier,
 ) {
     NavHost(navController = navController, startDestination = Screen.Home.route, modifier = modifier) {
-        composable(Screen.Home.route) {
+        composable(Screen.Home.route) { entry ->
             var showPaywall by remember { mutableStateOf(false) }
 
             HomeScreen(
-                onDocumentClick = { id -> navController.navigate(Screen.DocumentDetail.createRoute(id)) },
+                onDocumentClick = { id -> navController.fromTop(entry) { navigate(Screen.DocumentDetail.createRoute(id)) } },
                 onScanClick = onScanClick,
                 onUpgradeClick = { showPaywall = true },
-                onMergeClick = { ids -> navController.navigate(Screen.MergeConfirm.createRoute(ids)) },
-                onSettingsClick = { navController.navigate(Screen.Settings.route) },
+                onMergeClick = { ids -> navController.fromTop(entry) { navigate(Screen.MergeConfirm.createRoute(ids)) } },
+                onSettingsClick = { navController.fromTop(entry) { navigate(Screen.Settings.route) } },
             )
 
             if (showPaywall) {
                 ProUpgradeSheet(onDismiss = { showPaywall = false })
             }
         }
-        composable(Screen.Settings.route) {
-            SettingsScreen(onBack = { navController.popBackStack() })
+        composable(Screen.Settings.route) { entry ->
+            SettingsScreen(onBack = { navController.fromTop(entry) { popBackStack() } })
         }
         composable(
             route = Screen.DocumentDetail.route,
@@ -57,7 +58,7 @@ fun PaprNavHost(
             } else {
                 DocumentDetailScreen(
                     documentId = documentId,
-                    onBack = { navController.popBackStack() },
+                    onBack = { navController.fromTop(backStackEntry) { popBackStack() } },
                     onAddPagesClick = { onAddPagesClick(documentId) },
                     onReplacePageClick = { pageId -> onReplacePageClick(documentId, pageId) },
                 )
@@ -74,7 +75,7 @@ fun PaprNavHost(
             } else {
                 MergeConfirmScreen(
                     documentIds = documentIds,
-                    onBack = { navController.popBackStack() },
+                    onBack = { navController.fromTop(backStackEntry) { popBackStack() } },
                     onMergeComplete = { newDocumentId ->
                         navController.navigate(Screen.DocumentDetail.createRoute(newDocumentId)) {
                             popUpTo(Screen.MergeConfirm.route) { inclusive = true }
@@ -84,4 +85,13 @@ fun PaprNavHost(
             }
         }
     }
+}
+
+/**
+ * Runs [action] only while [entry] is still the screen on top. A second tap that lands during a
+ * screen transition would otherwise pop or push again - two Backs in a row popped Home itself
+ * and left a blank window.
+ */
+private fun NavHostController.fromTop(entry: NavBackStackEntry, action: NavHostController.() -> Unit) {
+    if (currentBackStackEntry?.id == entry.id) action()
 }
