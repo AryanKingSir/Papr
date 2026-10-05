@@ -119,7 +119,13 @@ class MainActivity : ComponentActivity() {
         pendingScanTarget = target
         container.documentScannerManager.getStartScanIntent(this, singlePage = target is ScanTarget.ReplacePage)
             .addOnSuccessListener { intentSender ->
-                scannerLauncher.launch(IntentSenderRequest.Builder(intentSender).build())
+                // The activity may have been recreated (rotation, theme change) while the scanner
+                // loaded; this one's launcher is unregistered then, and launching it crashes.
+                if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                    scannerLauncher.launch(IntentSenderRequest.Builder(intentSender).build())
+                } else {
+                    scannerOpening = false
+                }
             }
             .addOnFailureListener { error ->
                 scannerOpening = false
