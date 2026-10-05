@@ -1,7 +1,6 @@
 package com.papr.scanner.presentation.detail.components
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -24,6 +23,7 @@ import com.papr.scanner.pdf.ConfidentialMarkRenderer
 import com.papr.scanner.pdf.FittedBounds
 import com.papr.scanner.pdf.fittedImageBounds
 import com.papr.scanner.pdf.isPointNearStroke
+import com.papr.scanner.presentation.common.detectStrokes
 
 private val renderer = ConfidentialMarkRenderer()
 
@@ -77,18 +77,15 @@ fun ConfidentialMarkOverlay(
                 })
             }
             .pointerInput(fitted) {
-                detectDragGestures(
-                    onDragStart = { offset -> currentStroke = listOf(offset) },
-                    onDrag = { change, _ ->
-                        change.consume()
-                        currentStroke = currentStroke + change.position
-                    },
-                    onDragEnd = {
+                detectStrokes(
+                    drawDots = false,
+                    onStroke = { currentStroke = it },
+                    onEnd = {
                         val normalized = currentStroke.map { fitted.normalize(it) }
                         currentStroke = emptyList()
                         if (normalized.size >= 2) currentOnStrokeAdded(ConfidentialMarkStroke(normalized))
                     },
-                    onDragCancel = { currentStroke = emptyList() },
+                    onCancel = { currentStroke = emptyList() },
                 )
             }
     } else {

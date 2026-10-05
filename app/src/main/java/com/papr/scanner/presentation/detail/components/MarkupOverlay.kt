@@ -4,7 +4,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.runtime.Composable
@@ -37,6 +36,7 @@ import com.papr.scanner.pdf.PageOverlayRenderer
 import com.papr.scanner.pdf.fittedImageBounds
 import com.papr.scanner.pdf.isOnInkStroke
 import com.papr.scanner.pdf.isPointNearStroke
+import com.papr.scanner.presentation.common.detectStrokes
 import com.papr.scanner.presentation.detail.MarkupTool
 import com.papr.scanner.presentation.detail.markup.ToolStyle
 import com.papr.scanner.presentation.detail.markup.sizeFraction
@@ -165,19 +165,16 @@ fun MarkupOverlay(
             awaitEachGestureErasing(onPoint = ::eraseAt, onEnd = ::finish)
         }
         else -> Modifier.pointerInput(bounds, tool) {
-            detectDragGestures(
-                onDragStart = { offset -> liveStroke = listOf(offset) },
-                onDrag = { change, _ ->
-                    change.consume()
-                    liveStroke = liveStroke + change.position
-                },
-                onDragEnd = {
+            detectStrokes(
+                drawDots = true,
+                onStroke = { liveStroke = it },
+                onEnd = {
                     val points = liveStroke.map { bounds.normalize(it) }
                     liveStroke = emptyList()
                     val drawStyle = currentStyle
                     if (points.size >= 2 && drawStyle != null) currentOnStrokeDrawn(inkStroke(tool, drawStyle, points))
                 },
-                onDragCancel = { liveStroke = emptyList() },
+                onCancel = { liveStroke = emptyList() },
             )
         }
     }

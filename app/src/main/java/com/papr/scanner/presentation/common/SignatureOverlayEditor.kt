@@ -3,7 +3,6 @@ package com.papr.scanner.presentation.common
 import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -68,13 +67,14 @@ fun SignatureOverlayEditor(
                         .background(Color.White)
                         .onSizeChanged { canvasSize = it }
                         .pointerInput(Unit) {
-                            detectDragGestures(
-                                onDragStart = { offset -> currentStroke = listOf(offset) },
-                                onDrag = { change, _ -> currentStroke = currentStroke + change.position },
-                                onDragEnd = {
+                            detectStrokes(
+                                drawDots = true,
+                                onStroke = { currentStroke = it },
+                                onEnd = {
                                     strokes = strokes + listOf(currentStroke)
                                     currentStroke = emptyList()
                                 },
+                                onCancel = { currentStroke = emptyList() },
                             )
                         },
                 ) {
