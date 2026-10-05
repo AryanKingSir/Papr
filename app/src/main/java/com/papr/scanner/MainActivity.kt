@@ -40,9 +40,13 @@ class MainActivity : ComponentActivity() {
 
     private var pendingScanTarget: ScanTarget = ScanTarget.NewDocument
 
+    // Set from the tap until the scanner returns, so a double tap can't open it twice.
+    private var scannerOpening = false
+
     private val scannerLauncher = registerForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
+        scannerOpening = false
         if (result.resultCode == RESULT_OK) {
             container.scanImporter.import(pendingScanTarget, container.documentScannerManager.extractPageUris(result.data))
         }
@@ -110,12 +114,15 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startScan(target: ScanTarget) {
+        if (scannerOpening) return
+        scannerOpening = true
         pendingScanTarget = target
         container.documentScannerManager.getStartScanIntent(this, singlePage = target is ScanTarget.ReplacePage)
             .addOnSuccessListener { intentSender ->
                 scannerLauncher.launch(IntentSenderRequest.Builder(intentSender).build())
             }
             .addOnFailureListener { error ->
+                scannerOpening = false
                 Log.e("Papr", "Failed to start scanner", error)
                 // The scanner is part of Google Play services, so an outdated or missing copy is the
                 // usual cause - retrying alone won't help then.
