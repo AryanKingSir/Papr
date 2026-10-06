@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -167,10 +168,14 @@ private fun SizeChoice(tool: MarkupTool, option: MarkupSize, color: Color, selec
                     text = "A",
                     color = color,
                     fontWeight = FontWeight.Medium,
-                    fontSize = when (option) {
-                        MarkupSize.SMALL -> 11.sp
-                        MarkupSize.MEDIUM -> 15.sp
-                        MarkupSize.LARGE -> 20.sp
+                    // In dp, like the box it sits in: it's a picture of a size, not text to read,
+                    // so the phone's font size mustn't push it out of the box.
+                    fontSize = with(LocalDensity.current) {
+                        when (option) {
+                            MarkupSize.SMALL -> 11.dp
+                            MarkupSize.MEDIUM -> 15.dp
+                            MarkupSize.LARGE -> 20.dp
+                        }.toSp()
                     },
                 )
             } else {

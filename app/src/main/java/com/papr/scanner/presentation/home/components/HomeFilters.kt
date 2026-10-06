@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.DateRange
@@ -111,7 +112,12 @@ fun FilterSheet(
     var showDatePicker by remember { mutableStateOf(false) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Column(modifier = Modifier.padding(bottom = 24.dp)) {
+        // Scrolls so nothing is cut off in landscape or with large text.
+        Column(
+            modifier = Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 24.dp),
+        ) {
             Text(
                 "Filter documents",
                 style = MaterialTheme.typography.titleLarge,

@@ -3,8 +3,10 @@ package com.papr.scanner.presentation.home.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -103,7 +105,14 @@ fun DocumentGridItem(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Row(modifier = Modifier.padding(top = 2.dp)) {
+            // Side by side when they fit; at large text sizes the page count moves to its own line
+            // rather than squeezing the date down to a couple of letters.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp),
+            ) {
                 // The scan date - the same date the date-range filter matches on.
                 Text(
                     text = dateFormat.format(Date(document.createdAt)),
@@ -117,7 +126,6 @@ fun DocumentGridItem(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    modifier = Modifier.padding(start = 8.dp),
                 )
             }
         }

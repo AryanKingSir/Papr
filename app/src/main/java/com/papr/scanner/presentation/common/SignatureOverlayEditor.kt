@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
@@ -54,7 +56,13 @@ fun SignatureOverlayEditor(
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(16.dp)) {
-            Column(modifier = Modifier.padding(20.dp)) {
+            // Scrolls so the buttons stay reachable in landscape; drawing on the pad isn't
+            // affected, since the pad takes its own drags.
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp),
+            ) {
                 Text("Draw your signature", style = MaterialTheme.typography.titleLarge)
                 Text(
                     "Sign with your finger below.",
