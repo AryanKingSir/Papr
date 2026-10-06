@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,7 +35,20 @@ fun PageThumbnailStrip(
     onPageSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val listState = rememberLazyListState()
+    // Keeps the current page's thumbnail in view as the pages are swiped.
+    LaunchedEffect(currentPageIndex, pages.size) {
+        if (currentPageIndex !in pages.indices) return@LaunchedEffect
+        val visible = listState.layoutInfo.visibleItemsInfo
+        val fullyVisible = visible.any { item ->
+            item.index == currentPageIndex &&
+                item.offset >= listState.layoutInfo.viewportStartOffset &&
+                item.offset + item.size <= listState.layoutInfo.viewportEndOffset
+        }
+        if (!fullyVisible) listState.animateScrollToItem(currentPageIndex)
+    }
     LazyRow(
+        state = listState,
         modifier = modifier,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
