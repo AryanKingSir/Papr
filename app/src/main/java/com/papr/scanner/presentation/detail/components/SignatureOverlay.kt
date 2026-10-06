@@ -38,6 +38,7 @@ import java.io.File
 import kotlin.math.roundToInt
 
 private val CONTROL_SIZE = 28.dp
+private val TOUCH_SIZE = 48.dp
 
 /**
  * Draws a page's signature over the displayed page image, aligned to the
@@ -80,7 +81,7 @@ fun SignatureOverlay(
         val top = bounds.top + draft.y * bounds.height
         val width = draft.width * bounds.width
         val height = width * draft.aspectRatio
-        val controlRadiusPx = with(LocalDensity.current) { CONTROL_SIZE.toPx() } / 2f
+        val touchRadiusPx = with(LocalDensity.current) { TOUCH_SIZE.toPx() } / 2f
 
         val gestures = when {
             // Keyed on signature too: each saved placement makes a new `draft` state, and a
@@ -117,30 +118,29 @@ fun SignatureOverlay(
         }
 
         if (isPlacing) {
-            // Remove, on the top-right corner.
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 2.dp,
+            // Remove, on the top-right corner. Each control takes touches across a 48dp area
+            // around its smaller circle, so it's easy to hit without covering the signature.
+            Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .offset { IntOffset((left + width - controlRadiusPx).roundToInt(), (top - controlRadiusPx).roundToInt()) }
-                    .size(CONTROL_SIZE)
+                    .offset { IntOffset((left + width - touchRadiusPx).roundToInt(), (top - touchRadiusPx).roundToInt()) }
+                    .size(TOUCH_SIZE)
                     .clickable(onClick = onRemove),
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Filled.Close, contentDescription = "Remove signature", modifier = Modifier.size(16.dp))
+                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface, shadowElevation = 2.dp, modifier = Modifier.size(CONTROL_SIZE)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Filled.Close, contentDescription = "Remove signature", modifier = Modifier.size(16.dp))
+                    }
                 }
             }
             // Resize, on the bottom-right corner: the top-left corner stays put.
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary,
-                shadowElevation = 2.dp,
+            Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .offset {
-                        IntOffset((left + width - controlRadiusPx).roundToInt(), (top + height - controlRadiusPx).roundToInt())
+                        IntOffset((left + width - touchRadiusPx).roundToInt(), (top + height - touchRadiusPx).roundToInt())
                     }
-                    .size(CONTROL_SIZE)
+                    .size(TOUCH_SIZE)
                     .pointerInput(bounds, pageAspect, signature) {
                         detectDragGestures(
                             onDrag = { change, drag ->
@@ -151,13 +151,15 @@ fun SignatureOverlay(
                         )
                     },
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Filled.OpenInFull,
-                        contentDescription = "Resize signature",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(16.dp),
-                    )
+                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary, shadowElevation = 2.dp, modifier = Modifier.size(CONTROL_SIZE)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Filled.OpenInFull,
+                            contentDescription = "Resize signature",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
             }
         }
