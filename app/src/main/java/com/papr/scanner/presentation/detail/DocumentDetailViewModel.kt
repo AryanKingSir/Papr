@@ -89,6 +89,9 @@ class DocumentDetailViewModel(
     private val fileMutex = Mutex()
 
     private val markupHistory = MarkupHistory()
+    // Bumped when a Markup session ends. Edits wait their turn for fileMutex, so one still queued
+    // when Markup closes must not land in the next session's history.
+    private var markupSession = 0
 
     val uiState: StateFlow<DocumentDetailUiState> = combine(
         documentRepository.getDocumentById(documentId),
@@ -147,7 +150,10 @@ class DocumentDetailViewModel(
     /** Swaps the bottom bar to a group of tools (or back to the groups, with NONE). */
     fun openMode(mode: EditorMode) {
         // Undo covers one Markup session: leaving Markup ends it.
-        if (mode != EditorMode.MARKUP) markupHistory.clear()
+        if (mode != EditorMode.MARKUP) {
+            markupHistory.clear()
+            markupSession++
+        }
         localState.update {
             // Confidential is only kept while it's in use: reopening Markup starts on a free tool.
             val tool = if (mode == EditorMode.MARKUP && it.markupTool == MarkupTool.CONFIDENTIAL) MarkupTool.PEN else it.markupTool
@@ -304,14 +310,24 @@ class DocumentDetailViewModel(
     }
 
     // Undoing never needs Pro: it only puts back what the page had a moment ago.
+    // The history is read under fileMutex, after every edit queued before the tap has been
+    // recorded - otherwise a quick Undo could reverse an older edit and wipe a newer one.
     fun undoMarkup() {
-        markupHistory.undo()?.let { writeMarkup(it.pageId, it.before, "Couldn't undo") }
-        publishHistory()
+        val session = markupSession
+        launchEdit("Couldn't undo") {
+            if (session != markupSession) return@launchEdit
+            markupHistory.undo()?.let { writeMarkup(it.pageId, it.before) }
+            publishHistory()
+        }
     }
 
     fun redoMarkup() {
-        markupHistory.redo()?.let { writeMarkup(it.pageId, it.after, "Couldn't redo") }
-        publishHistory()
+        val session = markupSession
+        launchEdit("Couldn't redo") {
+            if (session != markupSession) return@launchEdit
+            markupHistory.redo()?.let { writeMarkup(it.pageId, it.after) }
+            publishHistory()
+        }
     }
 
     /**
@@ -515,20 +531,23 @@ class DocumentDetailViewModel(
 
     /** Like [updatePage], and records the change so it can be undone. */
     private fun editMarkup(pageId: Long, errorMessage: String, transform: (Page) -> Page) {
+        val session = markupSession
         launchEdit(errorMessage) {
             val page = documentRepository.getPage(pageId) ?: return@launchEdit
             val updated = transform(page)
             if (updated == page) return@launchEdit
             savePage(updated)
-            markupHistory.record(MarkupEdit(pageId, page.markupSnapshot(), updated.markupSnapshot()))
-            publishHistory()
+            if (session == markupSession) {
+                markupHistory.record(MarkupEdit(pageId, page.markupSnapshot(), updated.markupSnapshot()))
+                publishHistory()
+            }
         }
     }
 
-    private fun writeMarkup(pageId: Long, snapshot: MarkupSnapshot, errorMessage: String) {
-        updatePage(pageId, errorMessage) { page ->
-            page.copy(annotations = snapshot.annotations, confidentialMarks = snapshot.confidentialMarks)
-        }
+    /** Call under fileMutex. */
+    private suspend fun writeMarkup(pageId: Long, snapshot: MarkupSnapshot) {
+        val page = documentRepository.getPage(pageId) ?: return
+        savePage(page.copy(annotations = snapshot.annotations, confidentialMarks = snapshot.confidentialMarks))
     }
 
     private fun publishHistory() {
