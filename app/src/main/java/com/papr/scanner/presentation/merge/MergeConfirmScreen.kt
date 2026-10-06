@@ -3,8 +3,10 @@ package com.papr.scanner.presentation.merge
 import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -99,57 +101,72 @@ fun MergeConfirmScreen(
             )
         },
     ) { innerPadding ->
+        // Everything scrolls except the button, so the documents stay visible and the button
+        // reachable in landscape, with large text, or with the keyboard up.
         Column(
             modifier = Modifier
                 .padding(innerPadding)
+                .consumeWindowInsets(innerPadding)
+                .imePadding()
                 .fillMaxSize(),
         ) {
-            OutlinedTextField(
-                value = uiState.title,
-                onValueChange = viewModel::onTitleChange,
-                label = { Text("Title") },
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-            )
+            // Null while it's unknown or unlimited (Pro): no count is shown then.
+            val allowance = mergeAllowance
+            val mergesLeft = allowance?.remaining
+            // Nothing changes once merging has started, so nothing looks changeable.
+            val editable = !uiState.isMerging
             LazyColumn(modifier = Modifier.weight(1f)) {
+                item {
+                    OutlinedTextField(
+                        value = uiState.title,
+                        onValueChange = viewModel::onTitleChange,
+                        label = { Text("Title") },
+                        singleLine = true,
+                        enabled = editable,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                    )
+                }
                 itemsIndexed(uiState.documents, key = { _, document -> document.id }) { index, document ->
                     MergeDocumentRow(
                         document = document,
-                        canMoveUp = index > 0,
-                        canMoveDown = index < uiState.documents.size - 1,
+                        canMoveUp = editable && index > 0,
+                        canMoveDown = editable && index < uiState.documents.size - 1,
+                        canRemove = editable,
                         onMoveUp = { viewModel.moveDocument(document, -1) },
                         onMoveDown = { viewModel.moveDocument(document, 1) },
                         onRemove = { viewModel.removeDocument(document) },
                     )
                 }
-            }
-            ListItem(
-                headlineContent = { Text("Delete the originals") },
-                supportingContent = { Text("Remove these documents once the merged copy is saved") },
-                trailingContent = { Switch(checked = uiState.deleteOriginals, onCheckedChange = null) },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                modifier = Modifier.toggleable(
-                    value = uiState.deleteOriginals,
-                    role = Role.Switch,
-                    onValueChange = viewModel::setDeleteOriginals,
-                ),
-            )
-            // Null while it's unknown or unlimited (Pro): no count is shown then.
-            val allowance = mergeAllowance
-            val mergesLeft = allowance?.remaining
-            if (allowance != null && mergesLeft != null) {
-                Text(
-                    if (mergesLeft == 0) {
-                        "No free merges left this month"
-                    } else {
-                        "$mergesLeft of ${allowance.limit} free merges left this month"
-                    },
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (mergesLeft == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
-                )
+                item {
+                    ListItem(
+                        headlineContent = { Text("Delete the originals") },
+                        supportingContent = { Text("Remove these documents once the merged copy is saved") },
+                        trailingContent = { Switch(checked = uiState.deleteOriginals, onCheckedChange = null, enabled = editable) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        modifier = Modifier.toggleable(
+                            value = uiState.deleteOriginals,
+                            enabled = editable,
+                            role = Role.Switch,
+                            onValueChange = viewModel::setDeleteOriginals,
+                        ),
+                    )
+                }
+                if (allowance != null && mergesLeft != null) {
+                    item {
+                        Text(
+                            if (mergesLeft == 0) {
+                                "No free merges left this month"
+                            } else {
+                                "$mergesLeft of ${allowance.limit} free merges left this month"
+                            },
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (mergesLeft == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                        )
+                    }
+                }
             }
             if (mergesLeft == 0) {
                 Button(
@@ -191,6 +208,7 @@ private fun MergeDocumentRow(
     document: Document,
     canMoveUp: Boolean,
     canMoveDown: Boolean,
+    canRemove: Boolean,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onRemove: () -> Unit,
@@ -224,7 +242,7 @@ private fun MergeDocumentRow(
         IconButton(onClick = onMoveDown, enabled = canMoveDown) {
             Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move later")
         }
-        IconButton(onClick = onRemove) {
+        IconButton(onClick = onRemove, enabled = canRemove) {
             Icon(Icons.Filled.Close, contentDescription = "Remove from merge")
         }
     }
