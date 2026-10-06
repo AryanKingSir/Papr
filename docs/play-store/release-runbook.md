@@ -17,6 +17,12 @@ Output: `app/build/outputs/bundle/release/app-release.aab`, signed with the uplo
 
 For every new upload, bump `versionCode` (and usually `versionName`) in `app/build.gradle.kts`. Play rejects a versionCode it has already seen.
 
+The release build (from Studio too) is now signed with the upload key, so it can't install over a debug install or the old debug-signed release on a phone without uninstalling first, which deletes that phone's documents. For everyday testing on your own phone, keep using the debug build, or re-sign a release APK with the debug key (`apksigner sign --ks ~/.android/debug.keystore ...`).
+
+## Privacy policy page
+
+`docs/play-store/papr-legal/index.html` is the policy as a web page. Put it in a **public** repo named `papr-legal` as `index.html`, turn on GitHub Pages (Settings > Pages > Deploy from branch `main`, root), and it's served at `https://funnykid7.github.io/papr-legal/`. If you change `privacy-policy.md`, regenerate or edit the page to match.
+
 ## 2. Create the app in Play Console
 
 1. Play Console > **Create app**: name "Papr - Document Scanner", default language English, **App**, **Free** (free with in-app purchases is still "Free"), accept the declarations.
