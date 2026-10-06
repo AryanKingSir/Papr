@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -64,6 +66,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
@@ -414,10 +417,18 @@ fun DocumentDetailScreen(
         // leaving the document with the typed title silently lost.
         BackHandler(enabled = isEditingTitle) { isEditingTitle = false }
 
-        BoxWithConstraints(modifier = Modifier.padding(innerPadding)) {
+        val layoutDirection = LocalLayoutDirection.current
+        val bottomInset = innerPadding.calculateBottomPadding()
+        BoxWithConstraints(
+            modifier = Modifier.padding(
+                start = innerPadding.calculateStartPadding(layoutDirection),
+                top = innerPadding.calculateTopPadding(),
+                end = innerPadding.calculateEndPadding(layoutDirection),
+            ),
+        ) {
             if (maxWidth > maxHeight) {
                 // Landscape: the tools move to a rail on the right so the page gets the full height.
-                Row {
+                Row(modifier = Modifier.padding(bottom = bottomInset)) {
                     Column(modifier = Modifier.weight(1f), content = pageArea)
                     Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxHeight()) {
                         Box(modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)) { toolbar(true) }
@@ -426,8 +437,9 @@ fun DocumentDetailScreen(
             } else {
                 Column {
                     pageArea()
+                    // Edge to edge: the bar's colour runs under the navigation bar, its buttons sit above it.
                     Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
-                        Box(modifier = Modifier.padding(vertical = 4.dp)) { toolbar(false) }
+                        Box(modifier = Modifier.padding(bottom = bottomInset).padding(vertical = 4.dp)) { toolbar(false) }
                     }
                 }
             }
