@@ -23,7 +23,9 @@ fun PageImage(
 ) {
     val context = LocalContext.current
     val request = file?.let {
-        val cacheKey = "${it.absolutePath}-${it.lastModified()}"
+        // The size too: before Android 8 lastModified() only has whole seconds, so two quick
+        // rotations would share a key and show the first one's image.
+        val cacheKey = "${it.absolutePath}-${it.lastModified()}-${it.length()}"
         ImageRequest.Builder(context)
             .data(it)
             .memoryCacheKey(cacheKey)
