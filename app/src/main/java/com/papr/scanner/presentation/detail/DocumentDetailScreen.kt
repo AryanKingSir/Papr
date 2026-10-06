@@ -410,6 +410,9 @@ fun DocumentDetailScreen(
 
         // Back steps out of a group of tools before it leaves the document.
         BackHandler(enabled = uiState.mode != EditorMode.NONE) { viewModel.closeMode() }
+        // Composed after the one above, so it goes first: Back cancels a rename rather than
+        // leaving the document with the typed title silently lost.
+        BackHandler(enabled = isEditingTitle) { isEditingTitle = false }
 
         BoxWithConstraints(modifier = Modifier.padding(innerPadding)) {
             if (maxWidth > maxHeight) {
