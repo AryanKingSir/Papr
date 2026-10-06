@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -77,6 +78,16 @@ fun MarkupOverlay(
     // Hidden as soon as the eraser touches them, removed for real when the finger lifts.
     var erasing by remember { mutableStateOf(setOf<Any>()) }
     var dragging by remember { mutableStateOf<Pair<TextNote, Offset>?>(null) }
+    // A finished stroke, erase or move keeps showing until the saved page comes back, so it
+    // doesn't blink out of (or back into) view while the save is on its way.
+    var savingStrokes by remember { mutableStateOf(listOf<InkStroke>()) }
+    var savingErased by remember { mutableStateOf(setOf<Any>()) }
+    var savingMove by remember { mutableStateOf<Pair<TextNote, Offset>?>(null) }
+    LaunchedEffect(annotations) {
+        savingStrokes = emptyList()
+        savingErased = emptySet()
+        savingMove = null
+    }
     val currentAnnotations by rememberUpdatedState(annotations)
     val currentMarks by rememberUpdatedState(confidentialMarks)
     val currentStyle by rememberUpdatedState(style)
@@ -130,6 +141,7 @@ fun MarkupOverlay(
                         dragging = note to moved
                     }
                     if (finished) {
+                        savingMove = note to moved
                         currentOnTextMoved(
                             note,
                             (note.x + moved.x / bounds.width).coerceIn(0f, 1f),
@@ -160,6 +172,7 @@ fun MarkupOverlay(
                 erasing = emptySet()
                 val annotationsHit = currentAnnotations.filter { it in erased }
                 val marksHit = currentMarks.filter { it in erased }
+                savingErased = savingErased + annotationsHit
                 if (annotationsHit.isNotEmpty() || marksHit.isNotEmpty()) currentOnErase(annotationsHit, marksHit)
             }
             awaitEachGestureErasing(onPoint = ::eraseAt, onEnd = ::finish)
@@ -172,7 +185,11 @@ fun MarkupOverlay(
                     val points = liveStroke.map { bounds.normalize(it) }
                     liveStroke = emptyList()
                     val drawStyle = currentStyle
-                    if (points.size >= 2 && drawStyle != null) currentOnStrokeDrawn(inkStroke(tool, drawStyle, points))
+                    if (points.size >= 2 && drawStyle != null) {
+                        val stroke = inkStroke(tool, drawStyle, points)
+                        savingStrokes = savingStrokes + stroke
+                        currentOnStrokeDrawn(stroke)
+                    }
                 },
                 onCancel = { liveStroke = emptyList() },
             )
@@ -186,9 +203,9 @@ fun MarkupOverlay(
         } else {
             null
         }
-        val moving = dragging
+        val moving = dragging ?: savingMove
         val shown = annotations
-            .filterNot { it in erasing }
+            .filterNot { it in erasing || it in savingErased }
             .map { annotation ->
                 if (moving != null && annotation == moving.first) {
                     moving.first.copy(
@@ -199,6 +216,7 @@ fun MarkupOverlay(
                     annotation
                 }
             }
+            .plus(savingStrokes)
             .let { if (live != null) it + live else it }
         if (shown.isEmpty()) return@Canvas
         drawIntoCanvas { canvas ->

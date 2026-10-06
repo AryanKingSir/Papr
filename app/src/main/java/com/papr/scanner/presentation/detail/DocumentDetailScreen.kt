@@ -286,6 +286,7 @@ fun DocumentDetailScreen(
                 markupTool = uiState.markupTool.takeIf { inMarkup },
                 toolStyle = toolStyle,
                 isPlacingSignature = uiState.isPlacingSignature,
+                canAddMarks = isPro,
                 // Outside Markup, tapping a signature opens the Sign tools to move it.
                 onSignatureTap = { _: Page -> viewModel.openMode(EditorMode.SIGN) }.takeIf { !inMarkup },
                 onSignaturePlacementChange = { page, x, y, width -> viewModel.updateSignaturePlacement(page.id, x, y, width) },

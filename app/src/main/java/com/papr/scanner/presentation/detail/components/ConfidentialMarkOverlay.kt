@@ -3,6 +3,7 @@ package com.papr.scanner.presentation.detail.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,13 +43,19 @@ fun ConfidentialMarkOverlay(
     marks: List<ConfidentialMarkStroke>,
     editingEnabled: Boolean,
     modifier: Modifier = Modifier,
+    // False when a new mark won't be saved (Pro only): it then isn't kept on screen meanwhile.
+    canAddMarks: Boolean = true,
     crop: Boolean = false,
     onStrokeAdded: (ConfidentialMarkStroke) -> Unit = {},
     onStrokeErased: (ConfidentialMarkStroke) -> Unit = {},
 ) {
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     var currentStroke by remember { mutableStateOf(listOf<Offset>()) }
+    // A finished mark keeps showing until the saved page comes back, so it doesn't blink.
+    var savingMarks by remember { mutableStateOf(listOf<ConfidentialMarkStroke>()) }
+    LaunchedEffect(marks) { savingMarks = emptyList() }
     val currentMarks by rememberUpdatedState(marks)
+    val currentCanAddMarks by rememberUpdatedState(canAddMarks)
     val currentOnStrokeAdded by rememberUpdatedState(onStrokeAdded)
     val currentOnStrokeErased by rememberUpdatedState(onStrokeErased)
 
@@ -83,7 +90,11 @@ fun ConfidentialMarkOverlay(
                     onEnd = {
                         val normalized = currentStroke.map { fitted.normalize(it) }
                         currentStroke = emptyList()
-                        if (normalized.size >= 2) currentOnStrokeAdded(ConfidentialMarkStroke(normalized))
+                        if (normalized.size >= 2) {
+                            val mark = ConfidentialMarkStroke(normalized)
+                            if (currentCanAddMarks) savingMarks = savingMarks + mark
+                            currentOnStrokeAdded(mark)
+                        }
                     },
                     onCancel = { currentStroke = emptyList() },
                 )
@@ -100,7 +111,7 @@ fun ConfidentialMarkOverlay(
         val bounds = fitted ?: return@Canvas
         val liveStroke = currentStroke.takeIf { it.size >= 2 }
             ?.let { ConfidentialMarkStroke(it.map { offset -> bounds.normalize(offset) }) }
-        val allMarks = if (liveStroke != null) marks + liveStroke else marks
+        val allMarks = (marks + savingMarks).let { if (liveStroke != null) it + liveStroke else it }
         if (allMarks.isEmpty()) return@Canvas
 
         drawIntoCanvas { canvas ->

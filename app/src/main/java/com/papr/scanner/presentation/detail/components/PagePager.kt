@@ -38,6 +38,8 @@ fun PagePager(
     markupTool: MarkupTool?,
     toolStyle: ToolStyle?,
     isPlacingSignature: Boolean,
+    // False for free users: a newly drawn confidential mark won't be saved.
+    canAddMarks: Boolean,
     // Null when tapping a signature should do nothing (e.g. while marking up over it).
     onSignatureTap: ((Page) -> Unit)?,
     onSignaturePlacementChange: (page: Page, x: Float, y: Float, width: Float) -> Unit,
@@ -118,6 +120,7 @@ fun PagePager(
                             imageSize = imageSize,
                             marks = page.confidentialMarks,
                             editingEnabled = tool == MarkupTool.CONFIDENTIAL,
+                            canAddMarks = canAddMarks,
                             onStrokeAdded = { stroke -> onMarkStrokeAdded(page, stroke) },
                             onStrokeErased = { stroke -> onMarkStrokeErased(page, stroke) },
                             modifier = Modifier.fillMaxSize(),
