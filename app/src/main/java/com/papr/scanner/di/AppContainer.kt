@@ -72,7 +72,7 @@ class AppContainer(private val context: Context) {
     }
 
     val documentMerger: DocumentMerger by lazy {
-        DocumentMerger(documentRepository, documentDeleter, context)
+        DocumentMerger(documentRepository, documentDeleter, context, pageTextExtractor::extractInBackground)
     }
 
     val savedSignatureStore: SavedSignatureStore by lazy { SavedSignatureStore(context, applicationScope) }

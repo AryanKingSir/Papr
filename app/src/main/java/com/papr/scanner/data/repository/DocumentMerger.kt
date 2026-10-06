@@ -20,6 +20,8 @@ class DocumentMerger(
     private val documentRepository: DocumentRepository,
     private val documentDeleter: DocumentDeleter,
     private val appContext: Context,
+    // Recognizes text on pages that don't have it yet (in the background).
+    private val extractText: (List<Page>) -> Unit,
 ) {
     suspend fun merge(documentIds: List<Long>, title: String): Long {
         val now = System.currentTimeMillis()
@@ -42,7 +44,10 @@ class DocumentMerger(
                     .mapIndexed { index, page -> copyPage(page, newDocumentId, newDir, index) }
             }
             check(newPages.isNotEmpty()) { "Nothing to merge" }
-            documentRepository.insertPages(newPages)
+            val pageIds = documentRepository.insertPages(newPages)
+            // A page copied while its original was still being recognized has no text yet, and the
+            // recognition under way only updates the original - so the copy needs its own.
+            extractText(newPages.zip(pageIds) { page, id -> page.copy(id = id) }.filter { it.extractedText == null })
 
             val thumbnail = FileUtils.generateThumbnail(appContext, newPages.first())
             documentRepository.updateDocument(
