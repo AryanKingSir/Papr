@@ -199,4 +199,15 @@ class InvisibleTextLayerInjectorTest {
         val result = String(file.readBytes(), latin1)
         assertTrue(result.contains("(a\\(b\\)c\\\\d) Tj"))
     }
+
+    @Test
+    fun `keeps the euro sign, curly quotes and dashes, written in WinAnsi's own codes`() {
+        val file = writeFixture()
+
+        injector.inject(file, mapOf(0 to listOf(OcrTextElement("\u20AC25 don\u2019t Q1\u2013Q2", 0f, 0f, 12f, 50f))))
+
+        val result = String(file.readBytes(), latin1)
+        // WinAnsiEncoding: euro is 0x80, right single quote 0x92, en dash 0x96.
+        assertTrue(result.contains("(\u008025 don\u0092t Q1\u0096Q2) Tj"))
+    }
 }

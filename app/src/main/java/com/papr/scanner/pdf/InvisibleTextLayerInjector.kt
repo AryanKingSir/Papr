@@ -15,7 +15,8 @@ import java.util.Locale
  * raw content-stream operator with no Canvas equivalent - so this class
  * post-processes the already-written PDF bytes directly instead of drawing.
  *
- * Only text encodable in Latin-1 is injected, since it relies on the
+ * Only text WinAnsiEncoding can write is injected (Latin-1 plus the euro sign,
+ * curly quotes, dashes, bullet and ellipsis), since it relies on the
  * standard (unembedded) Helvetica base-14 font, which has no CJK/Arabic/etc.
  * glyphs. Non-Latin OCR text is simply skipped from the exported PDF's
  * selectable layer; it remains available for in-app search via
@@ -28,9 +29,12 @@ class InvisibleTextLayerInjector {
 
     private val latin1 = Charset.forName("ISO-8859-1")
 
+    // The font's /Encoding is WinAnsiEncoding, which is windows-1252.
+    private val winAnsi = Charset.forName("windows-1252")
+
     fun inject(pdfFile: File, elementsByPage: Map<Int, List<OcrTextElement>>) {
         val encodableByPage = elementsByPage.mapValues { (_, elements) ->
-            elements.filter { isLatin1Encodable(it.text) }
+            elements.filter { winAnsi.newEncoder().canEncode(it.text) }
         }
         if (encodableByPage.values.all { it.isEmpty() }) return
 
@@ -83,8 +87,6 @@ class InvisibleTextLayerInjector {
         pdfFile.writeBytes(original + appended.toString().toByteArray(latin1) + xref.toByteArray(latin1) + newTrailer.toByteArray(latin1))
     }
 
-    private fun isLatin1Encodable(text: String): Boolean = text.all { it.code in 0..255 }
-
     /**
      * Every page's object number, in page order. Skia splits the page tree into
      * nodes of at most 8 pages, so beyond that the root's /Kids are intermediate
@@ -135,10 +137,17 @@ class InvisibleTextLayerInjector {
             builder.append("/F1 ${formatNumber(element.fontSize)} Tf\n")
             builder.append("${formatNumber(horizontalScale)} Tz\n")
             builder.append("1 0 0 1 ${formatNumber(element.x)} ${formatNumber(element.y)} Tm\n")
-            builder.append("(${escapePdfString(element.text)}) Tj\nET\n")
+            builder.append("(${escapePdfString(toWinAnsiCodes(element.text))}) Tj\nET\n")
         }
         return builder.toString()
     }
+
+    /**
+     * [text] with each character replaced by the char whose code is its WinAnsi byte, so that
+     * writing the stream as Latin-1 (as the whole file is) puts the right byte in the PDF -
+     * the euro sign becomes 0x80 rather than a '?'.
+     */
+    private fun toWinAnsiCodes(text: String): String = String(text.toByteArray(winAnsi), latin1)
 
     private fun escapePdfString(input: String): String =
         input.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
