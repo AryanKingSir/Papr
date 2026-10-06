@@ -33,12 +33,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.papr.scanner.domain.model.ExportFormat
 import com.papr.scanner.pdf.security.StandardSecurityHandler
+import com.papr.scanner.presentation.common.LocalPaprHaptics
 import com.papr.scanner.presentation.detail.ExportSettings
 import com.papr.scanner.usage.Allowance
 import com.papr.scanner.usage.MeteredFeature
@@ -65,6 +68,14 @@ fun ExportOptionsSheet(
     var passwordEnabled by rememberSaveable { mutableStateOf(false) }
     var password by remember { mutableStateOf("") }
     val passwordSupported = StandardSecurityHandler.isSupportedPassword(password)
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    // The Pro sheet opens on top of this one; the password keyboard mustn't stay up behind it.
+    val lockedTap = { feature: MeteredFeature ->
+        keyboard?.hide()
+        focusManager.clearFocus()
+        onLockedOptionTap(feature)
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         // Scrolls so Export stays reachable when the options don't fit: landscape,
@@ -104,7 +115,7 @@ fun ExportOptionsSheet(
                     checked = ocrEnabled,
                     onCheckedChange = { ocrEnabled = it },
                     allowance = allowances[MeteredFeature.OCR_EXPORT],
-                    onLockedTap = { onLockedOptionTap(MeteredFeature.OCR_EXPORT) },
+                    onLockedTap = { lockedTap(MeteredFeature.OCR_EXPORT) },
                 )
                 OptionRow(
                     title = "Compress to target size",
@@ -112,7 +123,7 @@ fun ExportOptionsSheet(
                     checked = compressEnabled,
                     onCheckedChange = { compressEnabled = it },
                     allowance = allowances[MeteredFeature.COMPRESSED_EXPORT],
-                    onLockedTap = { onLockedOptionTap(MeteredFeature.COMPRESSED_EXPORT) },
+                    onLockedTap = { lockedTap(MeteredFeature.COMPRESSED_EXPORT) },
                 )
                 if (compressEnabled) {
                     Text("Target: ${"%.1f".format(targetSizeMb)} MB", modifier = Modifier.padding(top = 4.dp))
@@ -128,7 +139,7 @@ fun ExportOptionsSheet(
                     checked = passwordEnabled,
                     onCheckedChange = { passwordEnabled = it },
                     allowance = allowances[MeteredFeature.PASSWORD_EXPORT],
-                    onLockedTap = { onLockedOptionTap(MeteredFeature.PASSWORD_EXPORT) },
+                    onLockedTap = { lockedTap(MeteredFeature.PASSWORD_EXPORT) },
                 )
                 if (passwordEnabled) {
                     OutlinedTextField(
@@ -195,6 +206,7 @@ private fun OptionRow(
 ) {
     val remaining = allowance?.remaining
     val locked = remaining == 0
+    val haptics = LocalPaprHaptics.current
     // The whole row toggles, not just the switch - tapping the label is the natural target.
     // A used-up option can't be switched on; tapping it explains why instead.
     Row(
@@ -204,7 +216,10 @@ private fun OptionRow(
                 if (locked) {
                     Modifier.clickable(role = Role.Button, onClick = onLockedTap)
                 } else {
-                    Modifier.toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
+                    Modifier.toggleable(value = checked, role = Role.Switch) { on ->
+                        haptics.toggle(on)
+                        onCheckedChange(on)
+                    }
                 }
             )
             .padding(vertical = 8.dp),

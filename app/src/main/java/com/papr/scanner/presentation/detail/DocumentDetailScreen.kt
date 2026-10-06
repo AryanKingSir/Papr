@@ -79,13 +79,18 @@ import com.papr.scanner.core.FileUtils
 import com.papr.scanner.domain.model.NormalizedPoint
 import com.papr.scanner.domain.model.Page
 import com.papr.scanner.domain.model.TextNote
+import com.papr.scanner.domain.model.Tip
 import com.papr.scanner.domain.model.decodeAnnotations
 import com.papr.scanner.domain.model.encodeAnnotations
 import com.papr.scanner.pdf.overlays
+import com.papr.scanner.presentation.common.Haptic
+import com.papr.scanner.presentation.common.LocalPaprHaptics
 import com.papr.scanner.presentation.common.MainToolbar
 import com.papr.scanner.presentation.common.SignatureOverlayEditor
+import com.papr.scanner.presentation.common.TipCard
 import com.papr.scanner.presentation.common.ToolButton
 import com.papr.scanner.presentation.common.paprViewModel
+import com.papr.scanner.presentation.common.rememberTip
 import com.papr.scanner.presentation.detail.components.EraserIcon
 import com.papr.scanner.presentation.detail.components.ExportOptionsSheet
 import com.papr.scanner.presentation.detail.components.MarkupOptionsRow
@@ -126,6 +131,9 @@ fun DocumentDetailScreen(
     val defaultExportFormat by viewModel.defaultExportFormat.collectAsState()
     val context = LocalContext.current
     val currentOnBack by rememberUpdatedState(onBack)
+    val haptics = LocalPaprHaptics.current
+    val editorTip = rememberTip(Tip.EDITOR_TOOLS)
+    val markupTip = rememberTip(Tip.MARKUP)
 
     // Saveable, so rotating the phone (which recreates the screen) keeps open dialogs and drafts.
     var isEditingTitle by rememberSaveable { mutableStateOf(false) }
@@ -156,6 +164,7 @@ fun DocumentDetailScreen(
     LaunchedEffect(Unit) {
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.pdfReady.collect { file ->
+                haptics.perform(Haptic.CONFIRM)
                 showExportOptions = false
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "application/pdf"
@@ -169,6 +178,7 @@ fun DocumentDetailScreen(
     LaunchedEffect(Unit) {
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.imagesReady.collect { files ->
+                haptics.perform(Haptic.CONFIRM)
                 showExportOptions = false
                 val uris = files.map { FileUtils.getShareableUri(context, it) }
                 val shareIntent = if (uris.size == 1) {
@@ -184,10 +194,20 @@ fun DocumentDetailScreen(
         }
     }
     LaunchedEffect(Unit) {
-        viewModel.errors.collect { message -> Toast.makeText(context, message, Toast.LENGTH_LONG).show() }
+        viewModel.errors.collect { message ->
+            haptics.perform(Haptic.REJECT)
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
     }
     LaunchedEffect(Unit) {
-        viewModel.proSheetRequests.collect { reason -> paywallReason = reason }
+        viewModel.proSheetRequests.collect { reason ->
+            haptics.perform(Haptic.REJECT)
+            paywallReason = reason
+        }
+    }
+    // Opening any group of tools shows the tip has done its job.
+    LaunchedEffect(uiState.mode) {
+        if (uiState.mode != EditorMode.NONE) editorTip.dismiss()
     }
 
     if (showOrganize) {
@@ -313,7 +333,10 @@ fun DocumentDetailScreen(
                 onSignatureRemove = { page -> viewModel.removeSignature(page.id) },
                 onMarkStrokeAdded = { page, stroke -> viewModel.addConfidentialMarkStroke(page.id, stroke) },
                 onMarkStrokeErased = { page, stroke -> viewModel.eraseConfidentialMarkStroke(page.id, stroke) },
-                onStrokeDrawn = { page, stroke -> viewModel.addAnnotation(page.id, stroke) },
+                onStrokeDrawn = { page, stroke ->
+                    markupTip.dismiss()
+                    viewModel.addAnnotation(page.id, stroke)
+                },
                 onErase = { page, annotations, marks -> viewModel.eraseMarkup(page.id, annotations, marks) },
                 onTextTap = { page, note, anchor -> textEdit = TextEditRequest(page.id, note, anchor) },
                 onTextMoved = { page, note, x, y -> viewModel.saveTextNote(page.id, note, note.copy(x = x, y = y)) },
@@ -322,6 +345,7 @@ fun DocumentDetailScreen(
                     .fillMaxWidth(),
             )
 
+            TipCard(tip = markupTip, text = "Pick a tool, then draw on the page with your finger.", visible = inMarkup)
             when {
                 uiState.isPlacingSignature -> HintRow("Drag the signature to move it. Drag its corner to resize.")
                 uiState.mode == EditorMode.SIGN -> HintRow(
@@ -331,7 +355,8 @@ fun DocumentDetailScreen(
                         "Draw your signature, then drag it into place."
                     }
                 )
-                inMarkup && uiState.markupTool == MarkupTool.TEXT ->
+                // After the Markup tip, so the two never stack.
+                inMarkup && uiState.markupTool == MarkupTool.TEXT && !markupTip.visible ->
                     HintRow("Tap to add text. Tap text to edit it, drag to move it.")
             }
 
@@ -351,10 +376,21 @@ fun DocumentDetailScreen(
                     canUndo = uiState.canUndo,
                     canRedo = uiState.canRedo,
                     onStyleChange = { style -> viewModel.setToolStyle(uiState.markupTool, style) },
-                    onUndo = viewModel::undoMarkup,
-                    onRedo = viewModel::redoMarkup,
+                    onUndo = {
+                        haptics.perform(Haptic.SEGMENT_TICK)
+                        viewModel.undoMarkup()
+                    },
+                    onRedo = {
+                        haptics.perform(Haptic.SEGMENT_TICK)
+                        viewModel.redoMarkup()
+                    },
                 )
             } else {
+                TipCard(
+                    tip = editorTip,
+                    text = "Tap Markup, Sign, Pages or Export to start editing.",
+                    visible = uiState.mode == EditorMode.NONE,
+                )
                 // Hidden while marking up, so the page gets the room.
                 PageThumbnailStrip(
                     pages = uiState.pages,
@@ -376,7 +412,11 @@ fun DocumentDetailScreen(
                 }
                 EditorMode.MARKUP -> SubToolbar(vertical, onDone = viewModel::closeMode) {
                     val pick = { tool: MarkupTool ->
-                        viewModel.selectMarkupTool(tool, pageHasMarks = currentPage?.confidentialMarks?.isNotEmpty() == true)
+                        val pageHasMarks = currentPage?.confidentialMarks?.isNotEmpty() == true
+                        // A locked Confidential tap buzzes "no" when the Pro sheet opens instead.
+                        val opens = tool != MarkupTool.CONFIDENTIAL || pageHasMarks || isPro
+                        if (opens && tool != uiState.markupTool) haptics.perform(Haptic.SEGMENT_TICK)
+                        viewModel.selectMarkupTool(tool, pageHasMarks = pageHasMarks)
                     }
                     val tool = uiState.markupTool
                     ToolButton(Icons.Outlined.Create, "Pen", { pick(MarkupTool.PEN) }, selected = tool == MarkupTool.PEN)
@@ -393,7 +433,17 @@ fun DocumentDetailScreen(
                 }
                 EditorMode.SIGN -> SubToolbar(vertical, onDone = viewModel::closeMode) {
                     if (uiState.hasSavedSignature) {
-                        ToolButton(Icons.Outlined.BookmarkBorder, "Use saved", { currentPage?.let { viewModel.useSavedSignature(it.id) } }, enabled = hasPage)
+                        ToolButton(
+                            Icons.Outlined.BookmarkBorder,
+                            "Use saved",
+                            {
+                                currentPage?.let {
+                                    haptics.perform(Haptic.CONFIRM)
+                                    viewModel.useSavedSignature(it.id)
+                                }
+                            },
+                            enabled = hasPage,
+                        )
                     }
                     ToolButton(Icons.Outlined.Draw, "Draw new", { showSignatureEditor = true }, enabled = hasPage)
                     ToolButton(
@@ -489,6 +539,7 @@ fun DocumentDetailScreen(
     if (showSignatureEditor) {
         SignatureOverlayEditor(
             onSave = { bitmap, remember ->
+                haptics.perform(Haptic.CONFIRM)
                 currentPage?.let { viewModel.setSignature(it.id, bitmap, remember) }
                 showSignatureEditor = false
             },
@@ -503,7 +554,10 @@ fun DocumentDetailScreen(
             initialFormat = defaultExportFormat,
             allowances = allowances,
             onExport = viewModel::export,
-            onLockedOptionTap = { feature -> paywallReason = feature.limitReachedMessage },
+            onLockedOptionTap = { feature ->
+                haptics.perform(Haptic.REJECT)
+                paywallReason = feature.limitReachedMessage
+            },
             onDismiss = { showExportOptions = false },
         )
     }
@@ -545,6 +599,7 @@ fun DocumentDetailScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
+                    haptics.perform(Haptic.CONFIRM)
                     currentPage?.let { viewModel.deletePage(it.id) }
                     pendingDeletePage = false
                 }) { Text("Delete") }

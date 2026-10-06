@@ -8,6 +8,7 @@ import com.papr.scanner.billing.BillingManager
 import com.papr.scanner.billing.ConnectResult
 import com.papr.scanner.data.local.SavedSignature
 import com.papr.scanner.data.local.SavedSignatureStore
+import com.papr.scanner.data.local.datastore.OnboardingRepository
 import com.papr.scanner.data.local.datastore.UserPreferencesRepository
 import com.papr.scanner.domain.model.AppSettings
 import com.papr.scanner.domain.model.ExportFormat
@@ -27,6 +28,7 @@ import kotlinx.coroutines.launch
 
 class SettingsViewModel(
     private val preferences: UserPreferencesRepository,
+    private val onboarding: OnboardingRepository,
     private val savedSignatureStore: SavedSignatureStore,
     private val billingManager: BillingManager,
     isProFlow: Flow<Boolean>,
@@ -52,6 +54,11 @@ class SettingsViewModel(
     fun setDeleteOriginalsAfterMerge(enabled: Boolean) = save { preferences.setDeleteOriginalsAfterMerge(enabled) }
 
     fun setDefaultExportFormat(format: ExportFormat) = save { preferences.setDefaultExportFormat(format) }
+
+    fun setHapticsEnabled(enabled: Boolean) = save { preferences.setHapticsEnabled(enabled) }
+
+    /** Brings back the welcome slides and every one-time tip. */
+    fun resetTour() = save { onboarding.resetTour() }
 
     /** Replaces the saved signature with a freshly drawn one. */
     fun saveSignature(signature: Bitmap) = save {

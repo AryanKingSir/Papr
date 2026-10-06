@@ -1,0 +1,75 @@
+@file:OptIn(ExperimentalCoroutinesApi::class)
+
+package com.papr.scanner.data.local.datastore
+
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import com.papr.scanner.domain.model.OnboardingState
+import com.papr.scanner.domain.model.ThemeMode
+import com.papr.scanner.domain.model.Tip
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Rule
+import org.junit.Test
+import org.junit.rules.TemporaryFolder
+
+class OnboardingRepositoryTest {
+
+    @get:Rule
+    val tempFolder = TemporaryFolder()
+
+    private lateinit var dataStore: DataStore<Preferences>
+
+    // DataStore on the test's own dispatcher, as in UsageTrackerTest.
+    private fun TestScope.newRepository(): OnboardingRepository {
+        dataStore = PreferenceDataStoreFactory.create(
+            scope = CoroutineScope(coroutineContext + Job()),
+            produceFile = { tempFolder.newFile("${System.nanoTime()}.preferences_pb") },
+        )
+        return OnboardingRepository(dataStore)
+    }
+
+    @Test
+    fun `a new install has seen nothing`() = runTest {
+        assertEquals(OnboardingState(welcomeSeen = false, seenTips = emptySet()), newRepository().state.first())
+    }
+
+    @Test
+    fun `the welcome and each tip are remembered on their own`() = runTest {
+        val repository = newRepository()
+
+        repository.markWelcomeSeen()
+        repository.markTipSeen(Tip.ORGANIZE_DRAG)
+
+        assertEquals(OnboardingState(welcomeSeen = true, seenTips = setOf(Tip.ORGANIZE_DRAG)), repository.state.first())
+    }
+
+    @Test
+    fun `resetting the tour clears only the tour`() = runTest {
+        val repository = newRepository()
+        val settings = UserPreferencesRepository(dataStore)
+        settings.setThemeMode(ThemeMode.DARK)
+        settings.setProUnlocked(true)
+        dataStore.edit { it[intPreferencesKey("usage_merge")] = 2 }
+        repository.markWelcomeSeen()
+        Tip.entries.forEach { repository.markTipSeen(it) }
+
+        repository.resetTour()
+
+        assertEquals(OnboardingState(welcomeSeen = false, seenTips = emptySet()), repository.state.first())
+        assertEquals(ThemeMode.DARK, settings.settings.first().themeMode)
+        assertEquals(true, settings.isProUnlocked.first())
+        val prefs = dataStore.data.first()
+        assertEquals(2, prefs[intPreferencesKey("usage_merge")])
+        assertEquals(null, prefs[booleanPreferencesKey("welcome_seen")])
+    }
+}

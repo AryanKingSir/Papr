@@ -48,6 +48,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.createSavedStateHandle
 import com.papr.scanner.domain.model.Document
+import com.papr.scanner.presentation.common.Haptic
+import com.papr.scanner.presentation.common.LocalPaprHaptics
 import com.papr.scanner.presentation.common.PageImage
 import com.papr.scanner.presentation.common.paprViewModel
 import com.papr.scanner.presentation.paywall.ProUpgradeSheet
@@ -78,15 +80,25 @@ fun MergeConfirmScreen(
     // Non-null while the Pro sheet is open: why it opened.
     var paywallReason by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    val haptics = LocalPaprHaptics.current
 
     LaunchedEffect(Unit) {
-        viewModel.mergeComplete.collect { newDocumentId -> onMergeComplete(newDocumentId) }
+        viewModel.mergeComplete.collect { newDocumentId ->
+            haptics.perform(Haptic.CONFIRM)
+            onMergeComplete(newDocumentId)
+        }
     }
     LaunchedEffect(Unit) {
-        viewModel.errors.collect { message -> Toast.makeText(context, message, Toast.LENGTH_LONG).show() }
+        viewModel.errors.collect { message ->
+            haptics.perform(Haptic.REJECT)
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
     }
     LaunchedEffect(Unit) {
-        viewModel.proSheetRequests.collect { reason -> paywallReason = reason }
+        viewModel.proSheetRequests.collect { reason ->
+            haptics.perform(Haptic.REJECT)
+            paywallReason = reason
+        }
     }
 
     Scaffold(
@@ -149,7 +161,10 @@ fun MergeConfirmScreen(
                             value = uiState.deleteOriginals,
                             enabled = editable,
                             role = Role.Switch,
-                            onValueChange = viewModel::setDeleteOriginals,
+                            onValueChange = { on ->
+                                haptics.toggle(on)
+                                viewModel.setDeleteOriginals(on)
+                            },
                         ),
                     )
                 }

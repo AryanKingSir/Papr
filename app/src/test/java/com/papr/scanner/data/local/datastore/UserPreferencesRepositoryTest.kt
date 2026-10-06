@@ -43,6 +43,11 @@ class UserPreferencesRepositoryTest {
     }
 
     @Test
+    fun `haptics are on for a new install`() = runTest {
+        assertEquals(true, newRepository().settings.first().hapticsEnabled)
+    }
+
+    @Test
     fun `every setting is saved and read back`() = runTest {
         val repository = newRepository()
 
@@ -50,6 +55,7 @@ class UserPreferencesRepositoryTest {
         repository.setDynamicColor(false)
         repository.setDeleteOriginalsAfterMerge(true)
         repository.setDefaultExportFormat(ExportFormat.IMAGES)
+        repository.setHapticsEnabled(false)
 
         assertEquals(
             AppSettings(
@@ -57,6 +63,7 @@ class UserPreferencesRepositoryTest {
                 dynamicColor = false,
                 deleteOriginalsAfterMerge = true,
                 defaultExportFormat = ExportFormat.IMAGES,
+                hapticsEnabled = false,
             ),
             repository.settings.first(),
         )

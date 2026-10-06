@@ -10,4 +10,5 @@ data class AppSettings(
     val dynamicColor: Boolean = true,
     val deleteOriginalsAfterMerge: Boolean = false,
     val defaultExportFormat: ExportFormat = ExportFormat.PDF,
+    val hapticsEnabled: Boolean = true,
 )

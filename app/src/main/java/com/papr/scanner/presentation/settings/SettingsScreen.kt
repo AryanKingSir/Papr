@@ -28,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -60,13 +61,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import androidx.core.view.HapticFeedbackConstantsCompat
+import androidx.core.view.ViewCompat
 import com.papr.scanner.BuildConfig
 import com.papr.scanner.core.Constants
 import com.papr.scanner.domain.model.ExportFormat
 import com.papr.scanner.domain.model.ThemeMode
+import com.papr.scanner.presentation.common.Haptic
+import com.papr.scanner.presentation.common.LocalPaprHaptics
 import com.papr.scanner.presentation.common.PageImage
 import com.papr.scanner.presentation.common.SignatureOverlayEditor
 import com.papr.scanner.presentation.common.paprViewModel
@@ -75,10 +81,11 @@ import com.papr.scanner.usage.FREE_MONTHLY_LIMIT
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, onShowTour: () -> Unit) {
     val viewModel = paprViewModel { container ->
         SettingsViewModel(
             container.userPreferencesRepository,
+            container.onboardingRepository,
             container.savedSignatureStore,
             container.billingManager,
             container.usageTracker.isPro,
@@ -89,6 +96,8 @@ fun SettingsScreen(onBack: () -> Unit) {
     val isPro by viewModel.isPro.collectAsState()
     val isRestoring by viewModel.isRestoring.collectAsState()
     val context = LocalContext.current
+    val view = LocalView.current
+    val haptics = LocalPaprHaptics.current
 
     // Saveable, so rotating the phone keeps an open pad, dialog or sheet open.
     var showSignaturePad by rememberSaveable { mutableStateOf(false) }
@@ -143,6 +152,16 @@ fun SettingsScreen(onBack: () -> Unit) {
                 checked = settings.dynamicColor && dynamicColorAvailable,
                 enabled = dynamicColorAvailable,
                 onCheckedChange = { viewModel.setDynamicColor(it) },
+            )
+            SwitchRow(
+                title = "Haptics",
+                subtitle = "Vibrate gently to confirm taps, drags and finished tasks",
+                checked = settings.hapticsEnabled,
+                onCheckedChange = { on ->
+                    // Haptics are still off at this moment, so the switch plays its own "on" directly.
+                    if (on) ViewCompat.performHapticFeedback(view, HapticFeedbackConstantsCompat.TOGGLE_ON)
+                    viewModel.setHapticsEnabled(on)
+                },
             )
 
             SectionDivider()
@@ -258,12 +277,23 @@ fun SettingsScreen(onBack: () -> Unit) {
                 supportingContent = { Text("Your documents stay on this phone. Papr never uploads them.") },
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             )
+            ListItem(
+                headlineContent = { Text("Show the tour again") },
+                supportingContent = { Text("Replay the welcome slides and bring back the tips.") },
+                leadingContent = { Icon(Icons.Outlined.Lightbulb, contentDescription = null) },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                modifier = Modifier.clickable {
+                    viewModel.resetTour()
+                    onShowTour()
+                },
+            )
         }
     }
 
     if (showSignaturePad) {
         SignatureOverlayEditor(
             onSave = { bitmap, _ ->
+                haptics.perform(Haptic.CONFIRM)
                 viewModel.saveSignature(bitmap)
                 showSignaturePad = false
             },
@@ -280,6 +310,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             text = { Text("Pages you've already signed keep their signatures. This can't be undone.") },
             confirmButton = {
                 TextButton(onClick = {
+                    haptics.perform(Haptic.CONFIRM)
                     viewModel.removeSignature()
                     confirmRemoveSignature = false
                 }) { Text("Remove") }
@@ -328,12 +359,16 @@ private fun SwitchRow(
     onCheckedChange: (Boolean) -> Unit,
     enabled: Boolean = true,
 ) {
+    val haptics = LocalPaprHaptics.current
     ListItem(
         headlineContent = { Text(title) },
         supportingContent = { Text(subtitle) },
         trailingContent = { Switch(checked = checked, onCheckedChange = null, enabled = enabled) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        modifier = Modifier.toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange),
+        modifier = Modifier.toggleable(value = checked, enabled = enabled, role = Role.Switch) { on ->
+            haptics.toggle(on)
+            onCheckedChange(on)
+        },
     )
 }
 

@@ -9,6 +9,8 @@ import androidx.lifecycle.viewModelScope
 import com.papr.scanner.data.repository.DocumentDeleter
 import com.papr.scanner.data.repository.DocumentRepository
 import com.papr.scanner.domain.model.Document
+import com.papr.scanner.usage.Allowance
+import com.papr.scanner.usage.MeteredFeature
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -20,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -27,6 +30,7 @@ class HomeViewModel(
     private val documentRepository: DocumentRepository,
     private val documentDeleter: DocumentDeleter,
     isProFlow: Flow<Boolean>,
+    allowances: Flow<Map<MeteredFeature, Allowance>>,
 ) : ViewModel() {
 
     /**
@@ -34,6 +38,10 @@ class HomeViewModel(
      * doesn't flash up for Pro owners while the setting loads.
      */
     val isPro: StateFlow<Boolean?> = isProFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Free merges left this month; null for Pro (unlimited) and until it's known. At 0, Merge opens the Pro sheet. */
+    val mergesLeft: StateFlow<Int?> = allowances.map { it[MeteredFeature.MERGE]?.remaining }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val searchQuery = MutableStateFlow("")
     private val selectedFolder = MutableStateFlow<String?>(null)

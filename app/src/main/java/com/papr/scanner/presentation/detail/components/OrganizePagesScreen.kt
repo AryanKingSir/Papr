@@ -1,6 +1,7 @@
 package com.papr.scanner.presentation.detail.components
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -47,12 +48,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.papr.scanner.domain.model.Page
+import com.papr.scanner.domain.model.Tip
+import com.papr.scanner.presentation.common.Haptic
+import com.papr.scanner.presentation.common.LocalPaprHaptics
 import com.papr.scanner.presentation.common.MainToolbar
 import com.papr.scanner.presentation.common.SelectionCheck
+import com.papr.scanner.presentation.common.TipCard
 import com.papr.scanner.presentation.common.ToolButton
+import com.papr.scanner.presentation.common.rememberTip
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyGridState
 
@@ -75,6 +82,8 @@ fun OrganizePagesScreen(
     // A local copy that follows the finger while dragging; saved once, when the page is dropped.
     var order by remember { mutableStateOf(pages) }
     var isDragging by remember { mutableStateOf(false) }
+    val haptics = LocalPaprHaptics.current
+    val dragTip = rememberTip(Tip.ORGANIZE_DRAG)
     LaunchedEffect(pages) { if (!isDragging) order = pages }
 
     var selecting by rememberSaveable { mutableStateOf(false) }
@@ -92,6 +101,7 @@ fun OrganizePagesScreen(
     val gridState = rememberLazyGridState()
     val reorderState = rememberReorderableLazyGridState(gridState) { from, to ->
         order = order.toMutableList().apply { add(to.index, removeAt(from.index)) }
+        haptics.perform(Haptic.TICK)
     }
 
     Scaffold(
@@ -141,14 +151,18 @@ fun OrganizePagesScreen(
         },
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding)) {
-            Text(
-                text = if (selecting) "Tap pages to select them." else "Hold a page, then drag it to move it.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-            )
+            if (selecting) {
+                Text(
+                    text = "Tap pages to select them.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            } else {
+                TipCard(tip = dragTip, text = "Hold a page, then drag it to move it.")
+            }
             LazyVerticalGrid(
                 state = gridState,
                 columns = GridCells.Adaptive(minSize = 104.dp),
@@ -158,16 +172,27 @@ fun OrganizePagesScreen(
                 itemsIndexed(order, key = { _, page -> page.id }) { index, page ->
                     ReorderableItem(reorderState, key = page.id) { dragging ->
                         val isSelected = page.id in selection
+                        // The held page lifts towards the finger and the rest step back, so it's clear what's moving.
+                        val scale by animateFloatAsState(if (dragging) 1.08f else 1f, label = "lift")
+                        val alpha by animateFloatAsState(if (isDragging && !dragging) 0.6f else 1f, label = "dim")
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
                                 .padding(6.dp)
+                                .graphicsLayer { this.alpha = alpha }
                                 .longPressDraggableHandle(
                                     enabled = !selecting,
-                                    onDragStarted = { isDragging = true },
+                                    onDragStarted = {
+                                        isDragging = true
+                                        haptics.perform(Haptic.DRAG_START)
+                                        dragTip.dismiss()
+                                    },
                                     onDragStopped = {
                                         isDragging = false
-                                        onReorder(order.map { it.id })
+                                        val orderedIds = order.map { it.id }
+                                        // Only a page that actually moved gets the "done" feel.
+                                        if (orderedIds != pages.map { it.id }) haptics.perform(Haptic.CONFIRM)
+                                        onReorder(orderedIds)
                                     },
                                 ),
                         ) {
@@ -177,13 +202,17 @@ fun OrganizePagesScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .aspectRatio(PAGE_ASPECT)
-                                        .shadow(if (dragging) 8.dp else 0.dp, RoundedCornerShape(8.dp))
+                                        .graphicsLayer {
+                                            scaleX = scale
+                                            scaleY = scale
+                                        }
+                                        .shadow(if (dragging) 12.dp else 0.dp, RoundedCornerShape(8.dp))
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(MaterialTheme.colorScheme.surfaceVariant)
                                         .border(
                                             BorderStroke(
-                                                width = if (isSelected) 3.dp else 1.dp,
-                                                color = if (isSelected) {
+                                                width = if (isSelected || dragging) 3.dp else 1.dp,
+                                                color = if (isSelected || dragging) {
                                                     MaterialTheme.colorScheme.primary
                                                 } else {
                                                     MaterialTheme.colorScheme.outlineVariant
@@ -193,6 +222,7 @@ fun OrganizePagesScreen(
                                         )
                                         .clickable(role = if (selecting) Role.Checkbox else Role.Button) {
                                             if (selecting) {
+                                                haptics.toggle(on = !isSelected)
                                                 selected = if (isSelected) selection - page.id else selection + page.id
                                             } else {
                                                 onOpenPage(index)
@@ -249,6 +279,7 @@ fun OrganizePagesScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
+                    haptics.perform(Haptic.CONFIRM)
                     onDelete(selection)
                     pendingDelete = false
                     endSelection()

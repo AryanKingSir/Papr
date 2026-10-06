@@ -31,6 +31,7 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
             dynamicColor = prefs[DYNAMIC_COLOR] ?: defaults.dynamicColor,
             deleteOriginalsAfterMerge = prefs[DELETE_ORIGINALS_AFTER_MERGE] ?: defaults.deleteOriginalsAfterMerge,
             defaultExportFormat = enumOrNull<ExportFormat>(prefs[DEFAULT_EXPORT_FORMAT]) ?: defaults.defaultExportFormat,
+            hapticsEnabled = prefs[HAPTICS_ENABLED] ?: defaults.hapticsEnabled,
         )
     }
 
@@ -42,6 +43,8 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setDefaultExportFormat(format: ExportFormat) = dataStore.edit { it[DEFAULT_EXPORT_FORMAT] = format.name }
 
+    suspend fun setHapticsEnabled(enabled: Boolean) = dataStore.edit { it[HAPTICS_ENABLED] = enabled }
+
     private inline fun <reified T : Enum<T>> enumOrNull(name: String?): T? =
         enumValues<T>().firstOrNull { it.name == name }
 
@@ -51,5 +54,6 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val DELETE_ORIGINALS_AFTER_MERGE = booleanPreferencesKey("delete_originals_after_merge")
         val DEFAULT_EXPORT_FORMAT = stringPreferencesKey("default_export_format")
+        val HAPTICS_ENABLED = booleanPreferencesKey("haptics_enabled")
     }
 }

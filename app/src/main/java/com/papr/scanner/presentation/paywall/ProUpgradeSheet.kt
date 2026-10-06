@@ -21,11 +21,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.papr.scanner.billing.BillingState
+import com.papr.scanner.presentation.common.Haptic
+import com.papr.scanner.presentation.common.LocalPaprHaptics
 import com.papr.scanner.presentation.common.paprViewModel
 
 /** [reason] says why the sheet opened when a free limit stopped the user, e.g. a used-up monthly allowance. */
@@ -37,7 +42,14 @@ fun ProUpgradeSheet(onDismiss: () -> Unit, reason: String? = null) {
     val isProUnlocked by viewModel.isProUnlocked.collectAsState()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val activity = LocalActivity.current
+    val haptics = LocalPaprHaptics.current
     LaunchedEffect(Unit) { viewModel.retry() }
+    // Only the purchase made in this sheet: a Purchased state left over from earlier stays quiet.
+    var previousState by remember { mutableStateOf(state) }
+    LaunchedEffect(state) {
+        if (isFreshPurchase(previousState, state)) haptics.perform(Haptic.CONFIRM)
+        previousState = state
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         // Scrolls so the button stays reachable in landscape or with large text.
@@ -134,3 +146,7 @@ fun ProUpgradeSheet(onDismiss: () -> Unit, reason: String? = null) {
         }
     }
 }
+
+/** True when a purchase started from the sheet has just gone through. */
+internal fun isFreshPurchase(previous: BillingState, current: BillingState): Boolean =
+    previous is BillingState.Purchasing && current is BillingState.Purchased

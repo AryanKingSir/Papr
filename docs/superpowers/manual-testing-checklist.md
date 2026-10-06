@@ -184,3 +184,16 @@ A full audit (12 reviewers across the app, every finding re-checked by 2-3 indep
 17. Replace page on a page with marks, markup or a signature asks first ("Replace this page?"), and the replaced page has none of them; a page without any goes straight to the scanner. ✓ emulator 2026-10-06 (no-overlay case; the dialog case needs a working scanner)
 18. Free limits are 3 a month per feature (2026-10-06): the export sheet and merge screen count down from 3, Settings says "3 a month each", the Pro sheet message says "this month's 3 free ...". ✓ emulator 2026-10-06 (Settings)
 19. Settings > Contact us shows papr.support@gmail.com; tapping it opens the email app addressed to it with "Papr 1.0.0" as the subject (without an email app, the address is copied). ✓ emulator 2026-10-06 (opens Gmail compose)
+
+## 14. Haptics, onboarding and the merge paywall (2026-10-06)
+
+The scan review screen (Retake / Delete / Next / Add page) is Google's ML Kit scanner and can't be restyled, so it's left as is (user's choice).
+
+1. First launch shows 3 welcome slides (Scan any paper / Mark up, sign and organize / Share it your way). Skip and Get started land on Home with no flash of Home first; Back steps back a slide. A restart doesn't show them again. ✓ emulator 2026-10-06
+2. One-time tips, each gone for good once tapped or used: Home "Hold a document..." (a long-press also dismisses it), editor "Tap Markup, Sign, Pages or Export..." (opening any group dismisses it), Organize "Hold a page, then drag..." (in place of the old hint line; the first drag dismisses it), Markup "Pick a tool, then draw..." (the first stroke dismisses it). ✓ emulator 2026-10-06
+3. Settings > Show the tour again replays the slides (Skip returns to Settings) and brings every tip back, without touching settings, Pro or usage counts. ✓ emulator 2026-10-06
+4. Organize: a held page grows, gets a blue outline and a stronger shadow, and the other pages dim until it's dropped. ✓ emulator 2026-10-06
+5. Home with 0 merges left: Merge shows a lock and opens the Pro sheet ("You've used this month's 3 free merges."); the selection stays; the sheet survives rotation. ✓ emulator 2026-10-06
+6. A locked export option opens the Pro sheet over the export sheet; closing it goes back to the export sheet. ✓ emulator 2026-10-06
+7. Settings > Haptics (on by default) is saved across restarts. ✓ emulator 2026-10-06
+8. **moto g13 (by hand):** haptics on - a long-press to select, select toggles (Home, Organize), Organize pickup / a tick per page passed / a click on drop (nothing if the page didn't move), markup tool change, undo/redo, signature saved, delete confirmed, export ready, merge done, scan saved, every switch, an error toast, a locked or Pro-only tap (a "no" buzz). Haptics off: all of these are silent, including the long-press.

@@ -55,9 +55,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.papr.scanner.R
+import com.papr.scanner.domain.model.Tip
+import com.papr.scanner.presentation.common.Haptic
+import com.papr.scanner.presentation.common.LocalPaprHaptics
 import com.papr.scanner.presentation.common.MainToolbar
+import com.papr.scanner.presentation.common.TipCard
 import com.papr.scanner.presentation.common.ToolButton
 import com.papr.scanner.presentation.common.paprViewModel
+import com.papr.scanner.presentation.common.rememberTip
 import com.papr.scanner.presentation.home.components.ActiveFiltersRow
 import com.papr.scanner.presentation.home.components.DocumentGridItem
 import com.papr.scanner.presentation.home.components.DocumentSearchBar
@@ -65,6 +70,7 @@ import com.papr.scanner.presentation.home.components.EmptyState
 import com.papr.scanner.presentation.home.components.FilterButton
 import com.papr.scanner.presentation.home.components.FilterSheet
 import com.papr.scanner.presentation.home.components.NoMatchesState
+import com.papr.scanner.usage.MeteredFeature
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 
@@ -73,21 +79,33 @@ import kotlinx.coroutines.flow.drop
 fun HomeScreen(
     onDocumentClick: (Long) -> Unit,
     onScanClick: () -> Unit,
-    onUpgradeClick: () -> Unit,
+    // The reason the sheet opened, or null when the Pro button opened it.
+    onUpgradeClick: (reason: String?) -> Unit,
     onMergeClick: (documentIds: List<Long>) -> Unit,
     onSettingsClick: () -> Unit,
 ) {
     val viewModel = paprViewModel { container ->
-        HomeViewModel(container.documentRepository, container.documentDeleter, container.usageTracker.isPro)
+        HomeViewModel(
+            container.documentRepository,
+            container.documentDeleter,
+            container.usageTracker.isPro,
+            container.usageTracker.allowances,
+        )
     }
     val uiState by viewModel.uiState.collectAsState()
     val isPro by viewModel.isPro.collectAsState()
+    val mergesLeft by viewModel.mergesLeft.collectAsState()
+    val haptics = LocalPaprHaptics.current
+    val selectTip = rememberTip(Tip.HOME_SELECT)
     var pendingDeleteSelection by remember { mutableStateOf(false) }
     var showFilters by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     LaunchedEffect(Unit) {
-        viewModel.errors.collect { message -> Toast.makeText(context, message, Toast.LENGTH_LONG).show() }
+        viewModel.errors.collect { message ->
+            haptics.perform(Haptic.REJECT)
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
     }
     // A changed search or filter starts the results from the top. Without this the grid keeps
     // its first visible document in place, so clearing a filter left newer documents hidden
@@ -130,7 +148,7 @@ fun HomeScreen(
                     actions = {
                         if (isPro == false) {
                             FilledTonalButton(
-                                onClick = onUpgradeClick,
+                                onClick = { onUpgradeClick(null) },
                                 contentPadding = PaddingValues(start = 12.dp, end = 16.dp),
                                 modifier = Modifier.padding(end = 8.dp),
                             ) {
@@ -164,13 +182,20 @@ fun HomeScreen(
                                 // Says what it needs rather than sitting there disabled with no reason.
                                 if (selected.size < 2) "Merge (pick 2+)" else "Merge",
                                 {
-                                    onMergeClick(selected)
-                                    // Like Delete, acting on the selection ends it - otherwise Home is
-                                    // still mid-selection when you come back from the merged document.
-                                    viewModel.clearSelection()
+                                    if (mergesLeft == 0) {
+                                        // Straight to the Pro sheet; the selection stays so they can merge once upgraded.
+                                        haptics.perform(Haptic.REJECT)
+                                        onUpgradeClick(MeteredFeature.MERGE.limitReachedMessage)
+                                    } else {
+                                        onMergeClick(selected)
+                                        // Like Delete, acting on the selection ends it - otherwise Home is
+                                        // still mid-selection when you come back from the merged document.
+                                        viewModel.clearSelection()
+                                    }
                                 },
                                 weight,
                                 enabled = selected.size >= 2,
+                                locked = mergesLeft == 0,
                             )
                         }
                     }
@@ -218,6 +243,11 @@ fun HomeScreen(
             } else if (uiState.documents.isEmpty()) {
                 if (uiState.hasActiveFilters) NoMatchesState() else EmptyState(onScanClick = onScanClick)
             } else {
+                TipCard(
+                    tip = selectTip,
+                    text = "Hold a document to select it, then merge or delete.",
+                    visible = !uiState.isSelectionMode && !uiState.hasActiveFilters,
+                )
                 LazyVerticalGrid(
                     state = gridState,
                     // Two columns on a portrait phone (down to 360dp wide), more in landscape or on tablets.
@@ -232,12 +262,17 @@ fun HomeScreen(
                             document = document,
                             onClick = {
                                 if (uiState.isSelectionMode) {
+                                    haptics.toggle(on = document.id !in uiState.selectedDocumentIds)
                                     viewModel.toggleSelection(document.id)
                                 } else {
                                     onDocumentClick(document.id)
                                 }
                             },
-                            onLongClick = { viewModel.onDocumentLongPress(document) },
+                            onLongClick = {
+                                // The long-press itself buzzes (Compose's own, gated by the Haptics setting).
+                                selectTip.dismiss()
+                                viewModel.onDocumentLongPress(document)
+                            },
                             isContentMatch = document.id in uiState.contentMatchedIds,
                             selectionMode = uiState.isSelectionMode,
                             isSelected = document.id in uiState.selectedDocumentIds,
@@ -267,6 +302,7 @@ fun HomeScreen(
             text = { Text("This removes all ${if (count == 1) "its" else "their"} pages. This can't be undone.") },
             confirmButton = {
                 TextButton(onClick = {
+                    haptics.perform(Haptic.CONFIRM)
                     viewModel.deleteSelected()
                     pendingDeleteSelection = false
                 }) { Text("Delete") }

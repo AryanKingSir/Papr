@@ -10,6 +10,7 @@ import com.papr.scanner.billing.BillingManager
 import com.papr.scanner.billing.RealPlayBillingClient
 import com.papr.scanner.core.Constants
 import com.papr.scanner.data.local.SavedSignatureStore
+import com.papr.scanner.data.local.datastore.OnboardingRepository
 import com.papr.scanner.data.local.datastore.UserPreferencesRepository
 import com.papr.scanner.data.local.db.MIGRATION_1_2
 import com.papr.scanner.data.local.db.MIGRATION_2_3
@@ -20,6 +21,7 @@ import com.papr.scanner.data.repository.DocumentMerger
 import com.papr.scanner.data.repository.DocumentRepository
 import com.papr.scanner.data.repository.DocumentRepositoryImpl
 import com.papr.scanner.domain.model.AppSettings
+import com.papr.scanner.domain.model.OnboardingState
 import com.papr.scanner.pdf.BitmapPdfCompiler
 import com.papr.scanner.pdf.InvisibleTextLayerInjector
 import com.papr.scanner.pdf.OcrTextStamper
@@ -92,6 +94,15 @@ class AppContainer(private val context: Context) {
      */
     val appSettings: StateFlow<AppSettings?> by lazy {
         userPreferencesRepository.settings.stateIn(applicationScope, SharingStarted.Eagerly, null)
+    }
+
+    val onboardingRepository: OnboardingRepository by lazy {
+        OnboardingRepository(context.userPreferencesDataStore)
+    }
+
+    /** Held like [appSettings], so the first screen (welcome or Home) is known before anything is drawn. */
+    val onboardingState: StateFlow<OnboardingState?> by lazy {
+        onboardingRepository.state.stateIn(applicationScope, SharingStarted.Eagerly, null)
     }
 
     val documentScannerManager: DocumentScannerManager by lazy {
