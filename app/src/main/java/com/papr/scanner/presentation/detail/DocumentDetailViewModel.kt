@@ -18,6 +18,7 @@ import com.papr.scanner.domain.model.clampedTo
 import com.papr.scanner.domain.model.defaultSignaturePlacement
 import com.papr.scanner.domain.model.rotatedClockwise
 import com.papr.scanner.pdf.PageImageExporter
+import com.papr.scanner.pdf.PageOverlays
 import com.papr.scanner.pdf.PasswordProtection
 import com.papr.scanner.pdf.PdfEngine
 import com.papr.scanner.pdf.PdfGenerationOptions
@@ -421,22 +422,22 @@ class DocumentDetailViewModel(
                     _proSheetRequests.emit(usedUp.limitReachedMessage)
                     return@launch
                 }
-                val compiled = fileMutex.withLock {
+                val (title, pages) = fileMutex.withLock {
                     val document = documentRepository.getDocument(documentId) ?: return@launch
                     val pages = documentRepository.getPages(documentId)
                     if (pages.isEmpty()) return@launch
-                    val exportFile = File(
-                        FileUtils.documentDir(appContext, documentId),
-                        "${FileUtils.sanitizeFileName(document.title)}.pdf",
-                    )
-                    val result = pdfEngine.generatePdf(
-                        pages.map { File(it.imageUri) },
+                    document.title to snapshotPages(pages)
+                }
+                val exportFile = File(FileUtils.documentDir(appContext, documentId), "${FileUtils.sanitizeFileName(title)}.pdf")
+                val compiled = try {
+                    pdfEngine.generatePdf(
+                        pages.map { it.first },
                         exportFile,
                         PdfGenerationOptions(
                             ocrEnabled = settings.ocrEnabled,
                             // Keyed by position in the export, which is what PdfEngine's page index means.
-                            overlaysByPageIndex = pages.mapIndexedNotNull { index, page ->
-                                page.overlays().takeUnless { it.isEmpty }?.let { index to it }
+                            overlaysByPageIndex = pages.mapIndexedNotNull { index, (_, overlays) ->
+                                overlays.takeUnless { it.isEmpty }?.let { index to it }
                             }.toMap(),
                             passwordProtection = settings.password
                                 .takeIf { settings.passwordEnabled && it.isNotBlank() }
@@ -448,13 +449,18 @@ class DocumentDetailViewModel(
                             },
                         ),
                     )
+                } finally {
+                    exportSnapshotDir().deleteRecursively()
+                }
+                fileMutex.withLock {
+                    // Read again: the title may have changed while the export ran.
+                    val document = documentRepository.getDocument(documentId) ?: return@launch
                     documentRepository.updateDocument(
                         document.copy(pdfUri = exportFile.absolutePath, updatedAt = System.currentTimeMillis())
                     )
                     // The file is named after the title, so after a rename the previous
                     // export would otherwise stay behind in the document's folder for good.
                     document.pdfUri?.takeIf { it != exportFile.absolutePath }?.let { File(it).delete() }
-                    result
                 }
                 // Only a finished export counts against the free plan's limits.
                 usageTracker.recordUse(features)
@@ -487,17 +493,22 @@ class DocumentDetailViewModel(
         viewModelScope.launch {
             localState.update { it.copy(isExporting = true) }
             try {
-                val images = fileMutex.withLock {
+                val (title, pages) = fileMutex.withLock {
                     val document = documentRepository.getDocument(documentId) ?: return@launch
                     val pages = documentRepository.getPages(documentId)
                     if (pages.isEmpty()) return@launch
+                    document.title to snapshotPages(pages)
+                }
+                val images = try {
                     pageImageExporter.export(
-                        pages.map { File(it.imageUri) to it.overlays() },
+                        pages,
                         // Inside the document's folder: shareable through the FileProvider, and
                         // deleted along with the document.
                         File(FileUtils.documentDir(appContext, documentId), "images"),
-                        FileUtils.sanitizeFileName(document.title),
+                        FileUtils.sanitizeFileName(title),
                     )
+                } finally {
+                    exportSnapshotDir().deleteRecursively()
                 }
                 _imagesReady.emit(images)
             } catch (e: CancellationException) {
@@ -510,6 +521,28 @@ class DocumentDetailViewModel(
             }
         }
     }
+
+    /**
+     * Copies of [pages]' images and signatures as they are now, with their overlays, for an export
+     * to build from without holding fileMutex - so editing carries on during a long export, and an
+     * edit made meanwhile (a rotation, say) can't pair a new image with old marks. Call under
+     * fileMutex; delete [exportSnapshotDir] when done.
+     */
+    private suspend fun snapshotPages(pages: List<Page>): List<Pair<File, PageOverlays>> = withContext(Dispatchers.IO) {
+        val dir = exportSnapshotDir().apply { deleteRecursively(); mkdirs() }
+        pages.mapIndexed { index, page ->
+            val image = File(page.imageUri).copyTo(File(dir, "page-$index.jpg"), overwrite = true)
+            val signature = page.signature?.let { signature ->
+                val copy = File(signature.imagePath).takeIf { it.exists() }
+                    ?.copyTo(File(dir, "signature-$index.png"), overwrite = true)
+                signature.copy(imagePath = copy?.absolutePath ?: signature.imagePath)
+            }
+            image to page.overlays().copy(signature = signature)
+        }
+    }
+
+    // One export runs at a time (isExporting), so one folder is enough.
+    private fun exportSnapshotDir() = File(appContext.cacheDir, "export-snapshot")
 
     /**
      * Runs [edit] under [fileMutex], reporting any failure as [errorMessage] instead of crashing.
