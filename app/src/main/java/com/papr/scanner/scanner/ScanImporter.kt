@@ -123,7 +123,11 @@ class ScanImporter(
         }
     }
 
-    /** Replaces one page's image (e.g. re-scanning one that cropped wrong), keeping its marks and signature. */
+    /**
+     * Replaces one page's image (e.g. re-scanning one that cropped wrong). The new image starts
+     * clean: marks, markup and the signature were placed on the old framing, and on a rescan they
+     * could land over different text - a confidential mark included.
+     */
     private suspend fun replacePage(target: ScanTarget.ReplacePage, pageUri: Uri) {
         documentRepository.getPage(target.pageId) ?: return
         val newFile = documentScannerManager.importScannedPages(target.documentId, listOf(pageUri)).first()
@@ -133,11 +137,20 @@ class ScanImporter(
             withContext(Dispatchers.IO) { newFile.delete() }
             return
         }
-        val updatedPage = page.copy(imageUri = newFile.absolutePath, extractedText = null)
+        val updatedPage = page.copy(
+            imageUri = newFile.absolutePath,
+            extractedText = null,
+            confidentialMarks = emptyList(),
+            annotations = emptyList(),
+            signature = null,
+        )
         // Point the row at the new image *before* deleting the old one, so a
         // failure in between can never leave a page whose image is gone.
         documentRepository.updatePage(updatedPage)
-        withContext(Dispatchers.IO) { File(page.imageUri).delete() }
+        withContext(Dispatchers.IO) {
+            File(page.imageUri).delete()
+            page.signature?.let { File(it.imagePath).delete() }
+        }
         pageTextExtractor.extractInBackground(listOf(updatedPage))
 
         if (updatedPage.pageIndex == 0) {

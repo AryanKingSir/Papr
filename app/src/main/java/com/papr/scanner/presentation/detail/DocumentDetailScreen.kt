@@ -81,6 +81,7 @@ import com.papr.scanner.domain.model.Page
 import com.papr.scanner.domain.model.TextNote
 import com.papr.scanner.domain.model.decodeAnnotations
 import com.papr.scanner.domain.model.encodeAnnotations
+import com.papr.scanner.pdf.overlays
 import com.papr.scanner.presentation.common.MainToolbar
 import com.papr.scanner.presentation.common.SignatureOverlayEditor
 import com.papr.scanner.presentation.common.ToolButton
@@ -133,6 +134,7 @@ fun DocumentDetailScreen(
     var showSignatureEditor by rememberSaveable { mutableStateOf(false) }
     var showExportOptions by rememberSaveable { mutableStateOf(false) }
     var pendingDeletePage by rememberSaveable { mutableStateOf(false) }
+    var pendingReplacePage by rememberSaveable { mutableStateOf(false) }
     var textEdit by rememberSaveable(stateSaver = TextEditRequestSaver) { mutableStateOf<TextEditRequest?>(null) }
     var showOrganize by rememberSaveable { mutableStateOf(false) }
     // Non-null while the Pro sheet is open: why it opened.
@@ -404,7 +406,17 @@ fun DocumentDetailScreen(
                 EditorMode.PAGES -> SubToolbar(vertical, onDone = viewModel::closeMode) {
                     ToolButton(Icons.AutoMirrored.Outlined.RotateRight, "Rotate", { currentPage?.let { viewModel.rotatePage(it.id) } }, enabled = hasPage)
                     ToolButton(Icons.Outlined.GridView, "Organize", { showOrganize = true }, enabled = hasPage)
-                    ToolButton(Icons.Outlined.FindReplace, "Replace", { currentPage?.let { onReplacePageClick(it.id) } }, enabled = hasPage)
+                    ToolButton(
+                        Icons.Outlined.FindReplace,
+                        "Replace",
+                        {
+                            currentPage?.let { page ->
+                                // The rescan starts clean, so ask first if that would lose anything.
+                                if (page.overlays().isEmpty) onReplacePageClick(page.id) else pendingReplacePage = true
+                            }
+                        },
+                        enabled = hasPage,
+                    )
                     ToolButton(Icons.AutoMirrored.Outlined.NoteAdd, "Add", onAddPagesClick, enabled = uiState.document != null)
                     ToolButton(Icons.Outlined.Delete, "Delete", { pendingDeletePage = true }, enabled = hasPage)
                 }
@@ -498,6 +510,23 @@ fun DocumentDetailScreen(
 
     paywallReason?.let { reason ->
         ProUpgradeSheet(onDismiss = { paywallReason = null }, reason = reason)
+    }
+
+    if (pendingReplacePage) {
+        AlertDialog(
+            onDismissRequest = { pendingReplacePage = false },
+            title = { Text("Replace this page?") },
+            text = { Text("Its markup, signature and confidential marks will be removed, since they may not line up with the new scan.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    currentPage?.let { onReplacePageClick(it.id) }
+                    pendingReplacePage = false
+                }) { Text("Replace") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingReplacePage = false }) { Text("Cancel") }
+            },
+        )
     }
 
     if (pendingDeletePage) {
