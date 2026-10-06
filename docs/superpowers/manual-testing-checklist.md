@@ -160,3 +160,23 @@ Opened from the gear on the home screen (spec: `specs/2026-10-04-settings-design
 7. The home screen logo matches the app icon in light and dark; the select box on Home and in Organize pages is a single squircle that shows on white and coloured pages. ✓ emulator 2026-10-04
 8. Settings at the largest font size and in landscape: nothing overlaps (the signature buttons wrap). ✓ emulator 2026-10-04 (release)
 
+
+## 13. Pre-launch audit and Play readiness (2026-10-05/06)
+
+A full audit (12 reviewers across the app, every finding re-checked by 2-3 independent verifiers: 58 confirmed, 8 rejected) and device passes on a **Pixel 10a emulator, Android 17** (Play image, 16 KB pages), the Android 12 emulator (debug build, root) and the Android 7 emulator (release build). The fixes are commits 9a03e49..bdbae94. Items marked **✓ emulator 2026-10-06** were checked there; the rest need a Play testing track or the moto g13.
+
+1. Release build on Android 17 with 16 KB pages: launches, scans (gallery import), OCR export, password export, markup, sign, organize, settings - no crash. ✓ emulator 2026-10-06
+2. Pen, highlighter and signature strokes start exactly where the finger lands; a tap leaves a dot (the confidential marker's tap still erases). ✓ emulator 2026-10-06
+3. Strokes don't blink when lifted; erased items don't flash back; a dragged note doesn't snap back first. Best judged on the moto g13.
+4. Rotating the phone keeps an open signature pad (with its strokes), text note, rename, Organize screen and export options (the password is deliberately not kept). ✓ emulator 2026-10-06 (signature pad, export sheet)
+5. Double-tapping a Back arrow lands on Home, never a blank screen; double-tapping Scan opens one scanner. ✓ emulator 2026-10-06 (Back)
+6. Compress to an unreachable size: the share sheet still opens, and a message gives the smallest size reached (e.g. "0.23 MB"). ✓ emulator 2026-10-06
+7. Export sheet opens fully expanded; turning on a password keeps Export on screen; a password with a rupee sign or accented letter shows the "standard keyboard" message and disables Export.
+8. Merge screen in landscape and at large text: documents visible, Merge button reachable, and above the keyboard while typing a title. ✓ emulator 2026-10-06 (landscape)
+9. Large text (font 2.0): grid card shows the full date with the page count on its own line; search placeholder stays one line. ✓ emulator 2026-10-06
+10. Material You off: no purple tints anywhere (cards, sheets, bars) in light and dark. ✓ emulator 2026-10-06
+11. Cloud backup holds only the settings file (`datastore/user_prefs.preferences_pb`), no scans. ✓ emulator 2026-10-06 (bmgr, local transport)
+12. A corrupt settings file no longer crashes the app on launch; it starts with defaults. ✓ emulator 2026-10-06
+13. Upload key: `bundleRelease` makes an AAB signed with the upload key (CN=Papr) with the R8 mapping inside. ✓ 2026-10-05
+14. **Play testing track (needs the user):** buy Pro (limits vanish at once, "Thanks for upgrading!"); a slow payment method shows "pending" and unlocks once it clears, even if the app was closed; refund the order and Pro turns off at the next app start; offline never removes Pro; Settings > Restore says the right thing for owned / not owned / pending / unreachable.
+15. **moto g13:** a real-camera scan of paper; drawing feel (item 3); a 30+ page export finishes without the app being killed; printing a PDF.
