@@ -21,6 +21,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,11 +46,11 @@ fun SignatureOverlayEditor(
     // in the editor once a signature is saved (replacing it only happens in Settings).
     showRememberOption: Boolean = true,
 ) {
-    var strokes by remember { mutableStateOf(listOf<List<Offset>>()) }
+    var strokes by rememberSaveable(stateSaver = StrokesSaver) { mutableStateOf(listOf<List<Offset>>()) }
     var currentStroke by remember { mutableStateOf(listOf<Offset>()) }
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
     // On by default: drawing the same signature again on every page is the chore this saves.
-    var rememberSignature by remember { mutableStateOf(showRememberOption) }
+    var rememberSignature by rememberSaveable { mutableStateOf(showRememberOption) }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(16.dp)) {
@@ -155,3 +157,9 @@ private fun renderSignatureBitmap(strokes: List<List<Offset>>, size: IntSize): B
 }
 
 private const val STROKE_WIDTH_PX = 6f
+
+/** Keeps a half-drawn signature through a rotation: each stroke as x, y, x, y... */
+private val StrokesSaver = Saver<List<List<Offset>>, ArrayList<FloatArray>>(
+    save = { strokes -> ArrayList(strokes.map { stroke -> stroke.flatMap { listOf(it.x, it.y) }.toFloatArray() }) },
+    restore = { saved -> saved.map { flat -> flat.toList().chunked(2) { (x, y) -> Offset(x, y) } } },
+)

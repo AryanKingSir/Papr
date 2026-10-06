@@ -39,6 +39,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,9 +77,9 @@ fun OrganizePagesScreen(
     var isDragging by remember { mutableStateOf(false) }
     LaunchedEffect(pages) { if (!isDragging) order = pages }
 
-    var selecting by remember { mutableStateOf(false) }
-    var selected by remember { mutableStateOf(setOf<Long>()) }
-    var pendingDelete by remember { mutableStateOf(false) }
+    var selecting by rememberSaveable { mutableStateOf(false) }
+    var selected by rememberSaveable(stateSaver = PageIdsSaver) { mutableStateOf(setOf<Long>()) }
+    var pendingDelete by rememberSaveable { mutableStateOf(false) }
     // Pages deleted elsewhere (or by Delete here) drop out of the selection.
     val selection = selected.filter { id -> pages.any { it.id == id } }.toSet()
     val endSelection = {
@@ -261,3 +263,5 @@ fun OrganizePagesScreen(
 
 /** Cards are drawn at a typical page's proportions; each page fills its card cropped, like the home grid. */
 private const val PAGE_ASPECT = 0.75f
+
+private val PageIdsSaver = Saver<Set<Long>, LongArray>(save = { it.toLongArray() }, restore = { it.toSet() })

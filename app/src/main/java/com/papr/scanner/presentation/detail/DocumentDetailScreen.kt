@@ -55,6 +55,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,6 +76,8 @@ import com.papr.scanner.core.FileUtils
 import com.papr.scanner.domain.model.NormalizedPoint
 import com.papr.scanner.domain.model.Page
 import com.papr.scanner.domain.model.TextNote
+import com.papr.scanner.domain.model.decodeAnnotations
+import com.papr.scanner.domain.model.encodeAnnotations
 import com.papr.scanner.presentation.common.MainToolbar
 import com.papr.scanner.presentation.common.SignatureOverlayEditor
 import com.papr.scanner.presentation.common.ToolButton
@@ -119,16 +123,17 @@ fun DocumentDetailScreen(
     val context = LocalContext.current
     val currentOnBack by rememberUpdatedState(onBack)
 
-    var isEditingTitle by remember { mutableStateOf(false) }
-    var titleDraft by remember { mutableStateOf(TextFieldValue()) }
+    // Saveable, so rotating the phone (which recreates the screen) keeps open dialogs and drafts.
+    var isEditingTitle by rememberSaveable { mutableStateOf(false) }
+    var titleDraft by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue()) }
     val titleFocus = remember { FocusRequester() }
-    var showSignatureEditor by remember { mutableStateOf(false) }
-    var showExportOptions by remember { mutableStateOf(false) }
-    var pendingDeletePage by remember { mutableStateOf(false) }
-    var textEdit by remember { mutableStateOf<TextEditRequest?>(null) }
-    var showOrganize by remember { mutableStateOf(false) }
+    var showSignatureEditor by rememberSaveable { mutableStateOf(false) }
+    var showExportOptions by rememberSaveable { mutableStateOf(false) }
+    var pendingDeletePage by rememberSaveable { mutableStateOf(false) }
+    var textEdit by rememberSaveable(stateSaver = TextEditRequestSaver) { mutableStateOf<TextEditRequest?>(null) }
+    var showOrganize by rememberSaveable { mutableStateOf(false) }
     // Non-null while the Pro sheet is open: why it opened.
-    var paywallReason by remember { mutableStateOf<String?>(null) }
+    var paywallReason by rememberSaveable { mutableStateOf<String?>(null) }
 
     // Leave exactly once, whether the document was deleted here (its last
     // page removed) or turns out not to exist - never sit on an empty screen.
@@ -522,3 +527,16 @@ private fun HintRow(text: String) {
 
 /** A text note being added (no [existing]) at [anchor], or [existing] being edited. */
 private data class TextEditRequest(val pageId: Long, val existing: TextNote?, val anchor: NormalizedPoint)
+
+private val TextEditRequestSaver = Saver<TextEditRequest?, List<Any>>(
+    save = { request ->
+        request?.let { listOf(it.pageId, encodeAnnotations(listOfNotNull(it.existing)).orEmpty(), it.anchor.x, it.anchor.y) }
+    },
+    restore = { saved ->
+        TextEditRequest(
+            pageId = saved[0] as Long,
+            existing = decodeAnnotations(saved[1] as String).filterIsInstance<TextNote>().firstOrNull(),
+            anchor = NormalizedPoint(saved[2] as Float, saved[3] as Float),
+        )
+    },
+)

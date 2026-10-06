@@ -45,7 +45,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,9 +80,10 @@ fun SettingsScreen(onBack: () -> Unit) {
     val isRestoring by viewModel.isRestoring.collectAsState()
     val context = LocalContext.current
 
-    var showSignaturePad by remember { mutableStateOf(false) }
-    var confirmRemoveSignature by remember { mutableStateOf(false) }
-    var showProSheet by remember { mutableStateOf(false) }
+    // Saveable, so rotating the phone keeps an open pad, dialog or sheet open.
+    var showSignaturePad by rememberSaveable { mutableStateOf(false) }
+    var confirmRemoveSignature by rememberSaveable { mutableStateOf(false) }
+    var showProSheet by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.messages.collect { message -> Toast.makeText(context, message, Toast.LENGTH_LONG).show() }

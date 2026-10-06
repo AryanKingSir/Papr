@@ -29,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,11 +56,13 @@ fun ExportOptionsSheet(
 ) {
     // Fully open from the start: half open, turning on a password pushed Export below the screen's edge.
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var format by remember { mutableStateOf(initialFormat) }
-    var ocrEnabled by remember { mutableStateOf(false) }
-    var compressEnabled by remember { mutableStateOf(false) }
-    var targetSizeMb by remember { mutableFloatStateOf(1f) }
-    var passwordEnabled by remember { mutableStateOf(false) }
+    // Saveable, so options survive a rotation - except the password, which isn't written into
+    // saved state (that can end up on disk).
+    var format by rememberSaveable { mutableStateOf(initialFormat) }
+    var ocrEnabled by rememberSaveable { mutableStateOf(false) }
+    var compressEnabled by rememberSaveable { mutableStateOf(false) }
+    var targetSizeMb by rememberSaveable { mutableFloatStateOf(1f) }
+    var passwordEnabled by rememberSaveable { mutableStateOf(false) }
     var password by remember { mutableStateOf("") }
     val passwordSupported = StandardSecurityHandler.isSupportedPassword(password)
 
