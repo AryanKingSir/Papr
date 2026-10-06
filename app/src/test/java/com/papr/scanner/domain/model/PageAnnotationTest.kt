@@ -61,7 +61,7 @@ class PageAnnotationTest {
     @Test
     fun `a stroke turns with the page like a confidential mark does`() {
         val rotated = pen.rotatedClockwise() as InkStroke
-        val expected = ConfidentialMarkStroke(pen.points).rotatedClockwise().points
+        val expected = ConfidentialMarkStroke(pen.points).rotatedClockwise(pageAspect = 1f).points
 
         assertEquals(expected, rotated.points)
         assertEquals(pen.copy(points = expected), rotated)

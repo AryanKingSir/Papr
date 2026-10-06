@@ -5,8 +5,6 @@ import com.papr.scanner.domain.model.InkStroke
 import com.papr.scanner.domain.model.NormalizedPoint
 import kotlin.math.sqrt
 
-/** Fraction of the page's width used as the confidential-mark stroke's on-screen/export width. */
-internal const val CONFIDENTIAL_MARK_STROKE_WIDTH_FRACTION = 0.04f
 
 data class FittedBounds(val left: Float, val top: Float, val width: Float, val height: Float)
 

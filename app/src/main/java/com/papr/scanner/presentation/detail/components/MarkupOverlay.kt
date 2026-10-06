@@ -31,7 +31,7 @@ import com.papr.scanner.domain.model.InkTool
 import com.papr.scanner.domain.model.NormalizedPoint
 import com.papr.scanner.domain.model.PageAnnotation
 import com.papr.scanner.domain.model.TextNote
-import com.papr.scanner.pdf.CONFIDENTIAL_MARK_STROKE_WIDTH_FRACTION
+import com.papr.scanner.domain.model.widthFraction
 import com.papr.scanner.pdf.FittedBounds
 import com.papr.scanner.pdf.PageOverlayRenderer
 import com.papr.scanner.pdf.fittedImageBounds
@@ -163,7 +163,7 @@ fun MarkupOverlay(
                         is TextNote -> renderer.isOnTextNote(annotation, x, y, w, h, slopPx)
                     }
                 } + currentMarks.filter {
-                    isPointNearStroke(bounds.normalize(offset), it, CONFIDENTIAL_MARK_STROKE_WIDTH_FRACTION)
+                    isPointNearStroke(bounds.normalize(offset), it, it.widthFraction)
                 }
                 if (hits.isNotEmpty()) erasing = erasing + hits
             }

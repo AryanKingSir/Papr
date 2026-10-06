@@ -8,6 +8,7 @@ import android.graphics.RectF
 import androidx.core.graphics.toColorInt
 import androidx.core.graphics.withClip
 import com.papr.scanner.domain.model.ConfidentialMarkStroke
+import com.papr.scanner.domain.model.widthFraction
 
 class ConfidentialMarkRenderer {
 
@@ -15,10 +16,8 @@ class ConfidentialMarkRenderer {
     fun draw(canvas: Canvas, strokes: List<ConfidentialMarkStroke>, widthPx: Int, heightPx: Int) {
         if (widthPx <= 0 || heightPx <= 0) return
 
-        val strokeWidthPx = widthPx * CONFIDENTIAL_MARK_STROKE_WIDTH_FRACTION
         val strokePaint = Paint().apply {
             style = Paint.Style.STROKE
-            strokeWidth = strokeWidthPx
             strokeCap = Paint.Cap.ROUND
             strokeJoin = Paint.Join.ROUND
             isAntiAlias = true
@@ -30,13 +29,15 @@ class ConfidentialMarkRenderer {
         }
         val textPaint = Paint().apply {
             color = Color.WHITE
-            textSize = strokeWidthPx * TEXT_SIZE_FRACTION_OF_STROKE_WIDTH
             isAntiAlias = true
             textAlign = Paint.Align.LEFT
         }
 
         for (stroke in strokes) {
             if (stroke.points.size < 2) continue
+            val strokeWidthPx = widthPx * stroke.widthFraction
+            strokePaint.strokeWidth = strokeWidthPx
+            textPaint.textSize = strokeWidthPx * TEXT_SIZE_FRACTION_OF_STROKE_WIDTH
 
             val path = Path()
             stroke.points.forEachIndexed { index, point ->

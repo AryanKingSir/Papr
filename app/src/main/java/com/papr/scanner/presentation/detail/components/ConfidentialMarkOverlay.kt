@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.core.graphics.withTranslation
 import com.papr.scanner.domain.model.ConfidentialMarkStroke
 import com.papr.scanner.domain.model.NormalizedPoint
-import com.papr.scanner.pdf.CONFIDENTIAL_MARK_STROKE_WIDTH_FRACTION
+import com.papr.scanner.domain.model.widthFraction
 import com.papr.scanner.pdf.ConfidentialMarkRenderer
 import com.papr.scanner.pdf.FittedBounds
 import com.papr.scanner.pdf.fittedImageBounds
@@ -79,7 +79,7 @@ fun ConfidentialMarkOverlay(
                 detectTapGestures(onTap = { offset ->
                     val point = fitted.normalize(offset)
                     currentMarks
-                        .firstOrNull { isPointNearStroke(point, it, CONFIDENTIAL_MARK_STROKE_WIDTH_FRACTION) }
+                        .firstOrNull { isPointNearStroke(point, it, it.widthFraction) }
                         ?.let(currentOnStrokeErased)
                 })
             }

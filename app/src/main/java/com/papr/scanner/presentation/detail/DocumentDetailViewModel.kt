@@ -204,10 +204,11 @@ class DocumentDetailViewModel(
                 // have to turn with it - otherwise a mark would end up over different
                 // content than it was hiding. Worked out before the image is rewritten, so a
                 // failure can't leave the image turned and its overlays not.
+                val pageAspect = FileUtils.imageAspectRatio(file)
                 val rotated = page.copy(
-                    confidentialMarks = page.confidentialMarks.map { it.rotatedClockwise() },
+                    confidentialMarks = page.confidentialMarks.map { it.rotatedClockwise(pageAspect) },
                     annotations = page.annotations.map { it.rotatedClockwise() },
-                    signature = page.signature?.rotatedClockwise(newPageAspect = 1f / FileUtils.imageAspectRatio(file)),
+                    signature = page.signature?.rotatedClockwise(newPageAspect = 1f / pageAspect),
                 )
                 FileUtils.rotateJpeg(file, 90f)
                 if (rotated != page) documentRepository.updatePage(rotated)
