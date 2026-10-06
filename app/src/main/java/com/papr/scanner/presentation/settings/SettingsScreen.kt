@@ -1,10 +1,17 @@
 package com.papr.scanner.presentation.settings
 
+import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -54,13 +62,16 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import com.papr.scanner.BuildConfig
+import com.papr.scanner.core.Constants
 import com.papr.scanner.domain.model.ExportFormat
 import com.papr.scanner.domain.model.ThemeMode
 import com.papr.scanner.presentation.common.PageImage
 import com.papr.scanner.presentation.common.SignatureOverlayEditor
 import com.papr.scanner.presentation.common.paprViewModel
 import com.papr.scanner.presentation.paywall.ProUpgradeSheet
+import com.papr.scanner.usage.FREE_MONTHLY_LIMIT
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -208,7 +219,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         if (isPro) {
                             "Every feature, with no monthly limits."
                         } else {
-                            "5 a month each of searchable-text, password and compressed exports and merges."
+                            "$FREE_MONTHLY_LIMIT a month each of searchable-text, password and compressed exports and merges."
                         }
                     )
                 },
@@ -229,6 +240,16 @@ fun SettingsScreen(onBack: () -> Unit) {
                     Text("Restore purchase")
                 }
             }
+
+            SectionDivider()
+            SectionHeading("Contact us")
+            ListItem(
+                headlineContent = { Text(Constants.SUPPORT_EMAIL) },
+                supportingContent = { Text("Questions, problems or ideas? Tap to email us.") },
+                leadingContent = { Icon(Icons.Outlined.Email, contentDescription = null) },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                modifier = Modifier.clickable(onClickLabel = "Email us") { emailSupport(context) },
+            )
 
             SectionDivider()
             SectionHeading("About")
@@ -331,5 +352,21 @@ private fun <T> ChoiceRow(options: List<T>, selected: T, label: (T) -> String, o
                 shape = SegmentedButtonDefaults.itemShape(index, options.size),
             ) { Text(label(option)) }
         }
+    }
+}
+
+/**
+ * Opens the email app addressed to support, with the app version in the subject. Without an
+ * email app, copies the address instead, so it can still be pasted somewhere.
+ */
+private fun emailSupport(context: Context) {
+    val subject = Uri.encode("Papr ${BuildConfig.VERSION_NAME}")
+    val intent = Intent(Intent.ACTION_SENDTO, "mailto:${Constants.SUPPORT_EMAIL}?subject=$subject".toUri())
+    try {
+        context.startActivity(intent)
+    } catch (e: ActivityNotFoundException) {
+        val clipboard = context.getSystemService(ClipboardManager::class.java)
+        clipboard.setPrimaryClip(ClipData.newPlainText("Papr support email", Constants.SUPPORT_EMAIL))
+        Toast.makeText(context, "No email app found, so the address was copied.", Toast.LENGTH_LONG).show()
     }
 }
