@@ -110,7 +110,7 @@ fun DocumentGridItem(
             // Side by side when they fit; at large text sizes the page count moves to its own line
             // rather than squeezing the date down to a couple of letters.
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 2.dp),
@@ -121,7 +121,7 @@ fun DocumentGridItem(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.padding(end = 8.dp),
                 )
                 Text(
                     text = if (document.pageCount == 1) "1 page" else "${document.pageCount} pages",
