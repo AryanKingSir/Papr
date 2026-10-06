@@ -34,6 +34,7 @@ import com.papr.scanner.usage.MeteredFeature
 import com.papr.scanner.usage.UsageTracker
 import java.io.File
 import java.util.UUID
+import kotlin.math.ceil
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -473,7 +474,7 @@ class DocumentDetailViewModel(
                 if (!compiled.metTarget) {
                     _errors.emit(
                         "Couldn't get it under ${formatMb(settings.targetSizeMb)} MB. " +
-                            "The smallest it would go is ${formatMb(compiled.file.length() / BYTES_PER_MB.toFloat())} MB."
+                            "The smallest it would go is ${formatSmallestMb(compiled.file.length() / BYTES_PER_MB.toFloat())} MB."
                     )
                 }
                 _pdfReady.send(compiled.file)
@@ -626,6 +627,12 @@ class DocumentDetailViewModel(
 }
 
 private fun formatMb(megabytes: Float) = "%.1f".format(megabytes)
+
+/**
+ * Two decimals, rounded up: with one, a 0.23 MB result next to a 0.2 MB target read as "couldn't
+ * get under 0.2 MB, the smallest is 0.2 MB".
+ */
+private fun formatSmallestMb(megabytes: Float) = "%.2f".format(ceil(megabytes * 100) / 100)
 
 /** The limited features an export with [settings] uses - the password only counts when one is set, and images use none. */
 internal fun meteredFeaturesFor(settings: ExportSettings): Set<MeteredFeature> = buildSet {
