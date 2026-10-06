@@ -45,10 +45,18 @@ class DocumentScannerManager(private val context: Context) {
     suspend fun importScannedPages(documentId: Long, pageUris: List<Uri>): List<File> =
         withContext(Dispatchers.IO) {
             val dir = FileUtils.documentDir(context, documentId)
-            pageUris.map { uri ->
-                val destination = File(dir, "page_${UUID.randomUUID()}.jpg")
-                FileUtils.copyContentUriToFile(context, uri, destination)
-                destination
+            val copied = mutableListOf<File>()
+            try {
+                pageUris.forEach { uri ->
+                    val destination = File(dir, "page_${UUID.randomUUID()}.jpg")
+                    copied += destination
+                    FileUtils.copyContentUriToFile(context, uri, destination)
+                }
+                copied
+            } catch (e: Throwable) {
+                // No row points at these yet, so nothing else would ever delete them.
+                copied.forEach { it.delete() }
+                throw e
             }
         }
 }
