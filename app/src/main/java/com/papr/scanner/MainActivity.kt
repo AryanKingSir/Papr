@@ -76,7 +76,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             // Nothing until the stored theme is known (a few ms), rather than a flash of the wrong one.
-            val settings by container.userPreferencesRepository.settings.collectAsState(initial = null)
+            val settings by container.appSettings.collectAsState()
             val appSettings = settings
             if (appSettings != null) {
                 val darkTheme = when (appSettings.themeMode) {

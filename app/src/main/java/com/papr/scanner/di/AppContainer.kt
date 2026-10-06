@@ -19,6 +19,7 @@ import com.papr.scanner.data.repository.DocumentDeleter
 import com.papr.scanner.data.repository.DocumentMerger
 import com.papr.scanner.data.repository.DocumentRepository
 import com.papr.scanner.data.repository.DocumentRepositoryImpl
+import com.papr.scanner.domain.model.AppSettings
 import com.papr.scanner.pdf.BitmapPdfCompiler
 import com.papr.scanner.pdf.InvisibleTextLayerInjector
 import com.papr.scanner.pdf.OcrTextStamper
@@ -34,6 +35,9 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 
 // An unreadable file (a bad restore, a torn write) starts over from defaults rather than crashing
 // every launch. Pro comes back on the next Play check.
@@ -79,6 +83,15 @@ class AppContainer(private val context: Context) {
 
     val userPreferencesRepository: UserPreferencesRepository by lazy {
         UserPreferencesRepository(context.userPreferencesDataStore)
+    }
+
+    /**
+     * The settings, held for the app's lifetime. A recreated activity (rotation, dark mode) gets
+     * them at once instead of waiting a frame for DataStore - a frame that flashed the window's
+     * colour when the app's theme differs from the phone's. Null only before the first read.
+     */
+    val appSettings: StateFlow<AppSettings?> by lazy {
+        userPreferencesRepository.settings.stateIn(applicationScope, SharingStarted.Eagerly, null)
     }
 
     val documentScannerManager: DocumentScannerManager by lazy {
