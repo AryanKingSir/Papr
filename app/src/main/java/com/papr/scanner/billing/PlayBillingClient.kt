@@ -17,6 +17,8 @@ data class BillingPurchase(
 sealed interface PurchaseFlowResult {
     data class Success(val purchases: List<BillingPurchase>) : PurchaseFlowResult
     data object UserCancelled : PurchaseFlowResult
+    /** Play refused because this account already owns the product. */
+    data object AlreadyOwned : PurchaseFlowResult
     data class Error(val message: String) : PurchaseFlowResult
 }
 

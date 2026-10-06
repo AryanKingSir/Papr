@@ -114,6 +114,7 @@ class RealPlayBillingClient(context: Context) : PlayBillingClient {
             BillingClient.BillingResponseCode.OK ->
                 PurchaseFlowResult.Success(purchases.orEmpty().flatMap { it.toBillingPurchases() })
             BillingClient.BillingResponseCode.USER_CANCELED -> PurchaseFlowResult.UserCancelled
+            BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED -> PurchaseFlowResult.AlreadyOwned
             else -> PurchaseFlowResult.Error(billingResult.debugMessage)
         }
 

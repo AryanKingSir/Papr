@@ -4,10 +4,12 @@ package com.papr.scanner.billing
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.papr.scanner.data.local.datastore.UserPreferencesRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -188,6 +190,121 @@ class BillingManagerStateMachineTest {
         advanceUntilIdle()
 
         assertTrue(manager.isProUnlocked.value)
+    }
+
+    @Test
+    fun `a paid purchase unlocks Pro even when acknowledging it fails`() = runTest {
+        val client = FakePlayBillingClient().apply {
+            product = BillingProduct(productId, "$4.99")
+            acknowledgeResult = false
+        }
+        val scope = newManagerScope()
+        val manager = BillingManager(client, newUserPreferencesRepository(scope), productId, scope = scope)
+        advanceUntilIdle()
+        manager.connect()
+
+        client.emitPurchaseUpdate(
+            PurchaseFlowResult.Success(listOf(BillingPurchase(productId, "t", BillingPurchaseState.PURCHASED, isAcknowledged = false)))
+        )
+        advanceUntilIdle()
+
+        assertEquals(BillingState.Purchased, manager.state.value)
+        assertTrue(manager.isProUnlocked.value)
+    }
+
+    @Test
+    fun `connecting acknowledges a purchase that was left unacknowledged`() = runTest {
+        val client = FakePlayBillingClient().apply {
+            product = BillingProduct(productId, "$4.99")
+            ownedPurchases = listOf(BillingPurchase(productId, "t", BillingPurchaseState.PURCHASED, isAcknowledged = false))
+        }
+        val scope = newManagerScope()
+        val manager = BillingManager(client, newUserPreferencesRepository(scope), productId, scope = scope)
+        advanceUntilIdle()
+
+        manager.connect()
+        advanceUntilIdle()
+
+        assertEquals(listOf("t"), client.acknowledgedTokens)
+        assertTrue(manager.isProUnlocked.value)
+    }
+
+    @Test
+    fun `a pending purchase shows as pending, not as a fresh Upgrade button`() = runTest {
+        val client = FakePlayBillingClient().apply { product = BillingProduct(productId, "$4.99") }
+        val scope = newManagerScope()
+        val manager = BillingManager(client, newUserPreferencesRepository(scope), productId, scope = scope)
+        advanceUntilIdle()
+        manager.connect()
+
+        client.emitPurchaseUpdate(
+            PurchaseFlowResult.Success(listOf(BillingPurchase(productId, "t", BillingPurchaseState.PENDING, isAcknowledged = false)))
+        )
+        advanceUntilIdle()
+
+        assertEquals(BillingState.Pending, manager.state.value)
+        assertEquals(false, manager.isProUnlocked.value)
+    }
+
+    @Test
+    fun `connecting with a pending purchase settles into Pending`() = runTest {
+        val client = FakePlayBillingClient().apply {
+            product = BillingProduct(productId, "$4.99")
+            ownedPurchases = listOf(BillingPurchase(productId, "t", BillingPurchaseState.PENDING, isAcknowledged = false))
+        }
+        val scope = newManagerScope()
+        val manager = BillingManager(client, newUserPreferencesRepository(scope), productId, scope = scope)
+        advanceUntilIdle()
+
+        assertEquals(ConnectResult.PENDING, manager.connect())
+        assertEquals(BillingState.Pending, manager.state.value)
+    }
+
+    @Test
+    fun `already owning Pro when buying re-checks purchases and unlocks it`() = runTest {
+        val client = FakePlayBillingClient().apply { product = BillingProduct(productId, "$4.99") }
+        val scope = newManagerScope()
+        val manager = BillingManager(client, newUserPreferencesRepository(scope), productId, scope = scope)
+        advanceUntilIdle()
+        manager.connect()
+        client.ownedPurchases = listOf(BillingPurchase(productId, "t", BillingPurchaseState.PURCHASED, isAcknowledged = true))
+
+        client.emitPurchaseUpdate(PurchaseFlowResult.AlreadyOwned)
+        advanceUntilIdle()
+
+        assertTrue(manager.isProUnlocked.value)
+    }
+
+    @Test
+    fun `connect reports whether Play answered the purchase check`() = runTest {
+        val scope = newManagerScope()
+        val unreachable = FakePlayBillingClient().apply { connectResult = false }
+        val unanswered = FakePlayBillingClient().apply { ownedPurchases = null }
+        val answered = FakePlayBillingClient()
+
+        assertEquals(ConnectResult.UNAVAILABLE, BillingManager(unreachable, newUserPreferencesRepository(scope), productId, scope = scope).connect())
+        assertEquals(ConnectResult.UNAVAILABLE, BillingManager(unanswered, newUserPreferencesRepository(scope), productId, scope = scope).connect())
+        assertEquals(ConnectResult.CHECKED, BillingManager(answered, newUserPreferencesRepository(scope), productId, scope = scope).connect())
+    }
+
+    @Test
+    fun `a caller giving up mid-connect doesn't leave billing stuck in Connecting`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val client = FakePlayBillingClient().apply {
+            product = BillingProduct(productId, "$4.99")
+            connectGate = gate
+        }
+        val scope = newManagerScope()
+        val manager = BillingManager(client, newUserPreferencesRepository(scope), productId, scope = scope)
+        advanceUntilIdle()
+
+        val caller = launch { manager.connect() }
+        advanceUntilIdle()
+        caller.cancel()
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertTrue(manager.state.value is BillingState.Ready)
     }
 
     @Test

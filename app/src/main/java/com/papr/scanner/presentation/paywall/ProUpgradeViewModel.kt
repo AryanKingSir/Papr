@@ -13,11 +13,10 @@ class ProUpgradeViewModel(private val billingManager: BillingManager) : ViewMode
     val state: StateFlow<BillingState> = billingManager.state
     val isProUnlocked: StateFlow<Boolean> = billingManager.isProUnlocked
 
-    init {
-        retry()
-    }
-
+    /** Called each time the sheet opens, not once per ViewModel: the sheet's ViewModel outlives a closed sheet. */
     fun retry() {
+        val current = state.value
+        if (current is BillingState.Ready && current.product != null) return
         viewModelScope.launch { billingManager.connect() }
     }
 

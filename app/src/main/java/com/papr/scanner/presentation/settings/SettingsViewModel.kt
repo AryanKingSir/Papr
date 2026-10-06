@@ -4,7 +4,7 @@ import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.papr.scanner.billing.BillingManager
-import com.papr.scanner.billing.BillingState
+import com.papr.scanner.billing.ConnectResult
 import com.papr.scanner.data.local.SavedSignature
 import com.papr.scanner.data.local.SavedSignatureStore
 import com.papr.scanner.data.local.datastore.UserPreferencesRepository
@@ -73,12 +73,15 @@ class SettingsViewModel(
             _isRestoring.value = true
             val wasPro = isPro.value
             try {
-                billingManager.connect()
-                val message = when {
-                    billingManager.state.value == BillingState.Disconnected -> "Couldn't reach Google Play. Try again."
+                val message = when (billingManager.connect()) {
+                    ConnectResult.UNAVAILABLE -> "Couldn't reach Google Play. Try again."
+                    ConnectResult.PENDING -> "Your Papr Pro payment is still pending. Pro unlocks once Google Play confirms it."
                     // Read from storage: connect() has just written it, and a derived flow may not have caught up.
-                    preferences.isProUnlocked.first() -> if (wasPro) "You already own Papr Pro." else "Papr Pro restored."
-                    else -> "No Papr Pro purchase found on this Google account."
+                    ConnectResult.CHECKED -> when {
+                        !preferences.isProUnlocked.first() -> "No Papr Pro purchase found on this Google account."
+                        wasPro -> "You already own Papr Pro."
+                        else -> "Papr Pro restored."
+                    }
                 }
                 _messages.emit(message)
             } finally {

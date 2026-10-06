@@ -4,6 +4,8 @@ import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Button
@@ -16,6 +18,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -32,13 +35,16 @@ fun ProUpgradeSheet(onDismiss: () -> Unit, reason: String? = null) {
     val viewModel = paprViewModel { container -> ProUpgradeViewModel(container.billingManager) }
     val state by viewModel.state.collectAsState()
     val isProUnlocked by viewModel.isProUnlocked.collectAsState()
-    val sheetState = rememberModalBottomSheetState()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val activity = LocalActivity.current
+    LaunchedEffect(Unit) { viewModel.retry() }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        // Scrolls so the button stays reachable in landscape or with large text.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -66,6 +72,14 @@ fun ProUpgradeSheet(onDismiss: () -> Unit, reason: String? = null) {
             )
 
             when {
+                // Before the "already own" case: buying unlocks Pro a moment before this state lands.
+                state is BillingState.Purchased -> {
+                    Text(
+                        "Thanks for upgrading!",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(vertical = 16.dp),
+                    )
+                }
                 isProUnlocked -> {
                     Text(
                         "You already own Papr Pro.",
@@ -73,25 +87,33 @@ fun ProUpgradeSheet(onDismiss: () -> Unit, reason: String? = null) {
                         modifier = Modifier.padding(vertical = 16.dp),
                     )
                 }
-                state is BillingState.Ready -> {
+                state is BillingState.Ready && (state as BillingState.Ready).product != null -> {
                     val product = (state as BillingState.Ready).product
                     Text(
-                        product?.formattedPrice?.let { "One-time purchase, $it" } ?: "Unavailable right now",
+                        "One-time purchase, ${product?.formattedPrice}",
                         style = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier.padding(vertical = 16.dp),
                     )
                     Button(
                         onClick = { activity?.let(viewModel::purchase) },
-                        enabled = product != null,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 24.dp),
                     ) { Text("Upgrade") }
                 }
+                state is BillingState.Pending -> {
+                    Text(
+                        "Your payment is pending. Pro unlocks as soon as Google Play confirms it.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(vertical = 16.dp),
+                    )
+                }
                 state is BillingState.Purchasing -> {
                     CircularProgressIndicator(modifier = Modifier.padding(vertical = 16.dp))
                 }
-                state is BillingState.Disconnected -> {
+                // Connected but no price came back (Play busy, or the product not loaded).
+                state is BillingState.Ready || state is BillingState.Disconnected -> {
                     Text(
                         "Couldn't reach Google Play. Check your connection and try again.",
                         style = MaterialTheme.typography.bodyLarge,
@@ -104,13 +126,6 @@ fun ProUpgradeSheet(onDismiss: () -> Unit, reason: String? = null) {
                             .fillMaxWidth()
                             .padding(bottom = 24.dp),
                     ) { Text("Try again") }
-                }
-                state is BillingState.Purchased -> {
-                    Text(
-                        "Thanks for upgrading!",
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(vertical = 16.dp),
-                    )
                 }
                 else -> {
                     CircularProgressIndicator(modifier = Modifier.padding(vertical = 16.dp))
