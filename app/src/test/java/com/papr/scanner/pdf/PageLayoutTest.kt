@@ -67,4 +67,16 @@ class PageLayoutTest {
     fun `never scales a page up`() {
         assertEquals(200 to 250, scaledSize(200, 250, scale = 0.5f, minDimension = 300))
     }
+
+    @Test
+    fun `portrait and landscape pages each get their own shared size, never a square`() {
+        val boxes = pageBoxesByOrientation(listOf(2400 to 3200, 3300 to 2500, 2200 to 3000, 3000 to 2300))
+
+        assertEquals(listOf(2400 to 3200, 3300 to 2500, 2400 to 3200, 3300 to 2500), boxes)
+    }
+
+    @Test
+    fun `pages of one orientation all share the largest size`() {
+        assertEquals(List(2) { 2500 to 3300 }, pageBoxesByOrientation(listOf(2400 to 3300, 2500 to 3200)))
+    }
 }

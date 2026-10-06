@@ -68,15 +68,13 @@ class BitmapPdfCompiler {
     ) {
         val document = PdfDocument()
         try {
-            // All pages share one physical page size - the largest decoded page -
-            // and every page's image is fit-scaled into it, so a multi-page scan
-            // of e.g. a book gets same-size pages with same-size content, even
-            // though each scan's pixel dimensions differ with how far away the
-            // camera was. The box is measured at full resolution, so compressing
-            // lowers image resolution without shrinking the paper itself.
-            val (pageWidthPx, pageHeightPx) = uniformPageSizePx(pageFiles)
-            val pageWidthPt = (pageWidthPx * POINTS_PER_PIXEL).roundToInt()
-            val pageHeightPt = (pageHeightPx * POINTS_PER_PIXEL).roundToInt()
+            // Pages of one orientation share one physical page size - the largest of
+            // them - and every page's image is fit-scaled into its box, so a multi-page
+            // scan of e.g. a book gets same-size pages with same-size content, even
+            // though each scan's pixel dimensions differ with how far away the camera
+            // was (see pageBoxesByOrientation). The boxes are measured at full
+            // resolution, so compressing lowers image resolution without shrinking the paper.
+            val pageBoxes = pageBoxesByOrientation(pageFiles.map(::cappedImageSize))
             // PdfDocument keeps a copy of every page's pixels until writeTo, so it's the whole
             // document's pixel count that has to stay bounded, not just each page's.
             val maxPixelsPerPage = TOTAL_PIXEL_BUDGET / pageFiles.size.coerceAtLeast(1)
@@ -86,7 +84,10 @@ class BitmapPdfCompiler {
                     preparePage(Canvas(bitmap), bitmap, index)
                     // Computed from the bitmap actually decoded, not predicted
                     // dimensions, so a page can never overflow the box and be cropped.
+                    val (pageWidthPx, pageHeightPx) = pageBoxes[index]
                     val placement = fitPlacement(pageWidthPx, pageHeightPx, bitmap.width, bitmap.height)
+                    val pageWidthPt = (pageWidthPx * POINTS_PER_PIXEL).roundToInt()
+                    val pageHeightPt = (pageHeightPx * POINTS_PER_PIXEL).roundToInt()
                     val page = document.startPage(PdfDocument.PageInfo.Builder(pageWidthPt, pageHeightPt, index + 1).create())
                     try {
                         page.canvas.scale(POINTS_PER_PIXEL, POINTS_PER_PIXEL)
@@ -109,17 +110,11 @@ class BitmapPdfCompiler {
         }
     }
 
-    /** The largest post-downsample-cap page dimensions across the document, used as the uniform PDF page size. */
-    private fun uniformPageSizePx(pageFiles: List<File>): Pair<Int, Int> {
-        var maxWidth = 1
-        var maxHeight = 1
-        for (pageFile in pageFiles) {
-            val bounds = decodeBounds(pageFile)
-            val sampleSize = sampleSizeFor(maxOf(bounds.outWidth, bounds.outHeight), MAX_PAGE_DIMENSION)
-            maxWidth = maxOf(maxWidth, bounds.outWidth / sampleSize)
-            maxHeight = maxOf(maxHeight, bounds.outHeight / sampleSize)
-        }
-        return maxWidth to maxHeight
+    /** A page image's size after the same downsampling cap [decodeScaled] applies. */
+    private fun cappedImageSize(pageFile: File): Pair<Int, Int> {
+        val bounds = decodeBounds(pageFile)
+        val sampleSize = sampleSizeFor(maxOf(bounds.outWidth, bounds.outHeight), MAX_PAGE_DIMENSION)
+        return (bounds.outWidth / sampleSize) to (bounds.outHeight / sampleSize)
     }
 
     /**

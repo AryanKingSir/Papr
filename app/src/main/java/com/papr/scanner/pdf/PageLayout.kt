@@ -60,3 +60,20 @@ internal fun scaledSize(width: Int, height: Int, scale: Float, minDimension: Int
     val factor = maxOf(scale, floor).coerceAtMost(1f)
     return (width * factor).roundToInt() to (height * factor).roundToInt()
 }
+
+/**
+ * Each page's PDF box, given every page's image size (width to height): pages of the same
+ * orientation share one size, the largest of them, so a multi-page scan gets same-size pages
+ * even though each photo's pixel size differs. Portrait and landscape pages get separate sizes,
+ * so a document mixing the two never turns every page into a square. A square page counts as
+ * portrait.
+ */
+internal fun pageBoxesByOrientation(imageSizes: List<Pair<Int, Int>>): List<Pair<Int, Int>> {
+    fun isLandscape(size: Pair<Int, Int>) = size.first > size.second
+    fun largest(sizes: List<Pair<Int, Int>>) =
+        (sizes.maxOfOrNull { it.first } ?: 1) to (sizes.maxOfOrNull { it.second } ?: 1)
+    val (landscape, portrait) = imageSizes.partition(::isLandscape)
+    val landscapeBox = largest(landscape)
+    val portraitBox = largest(portrait)
+    return imageSizes.map { if (isLandscape(it)) landscapeBox else portraitBox }
+}
