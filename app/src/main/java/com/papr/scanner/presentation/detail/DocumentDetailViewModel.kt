@@ -37,6 +37,7 @@ import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,6 +47,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -117,11 +119,14 @@ class DocumentDetailViewModel(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DocumentDetailUiState())
 
-    private val _pdfReady = MutableSharedFlow<File>()
-    val pdfReady: SharedFlow<File> = _pdfReady.asSharedFlow()
+    // Channels, not SharedFlows: an export that finishes while the screen is away (in the
+    // background, or mid-rotation) waits to be shared instead of being dropped - after its free
+    // use was already counted.
+    private val _pdfReady = Channel<File>(Channel.BUFFERED)
+    val pdfReady: Flow<File> = _pdfReady.receiveAsFlow()
 
-    private val _imagesReady = MutableSharedFlow<List<File>>()
-    val imagesReady: SharedFlow<List<File>> = _imagesReady.asSharedFlow()
+    private val _imagesReady = Channel<List<File>>(Channel.BUFFERED)
+    val imagesReady: Flow<List<File>> = _imagesReady.receiveAsFlow()
 
     private val _errors = MutableSharedFlow<String>()
     val errors: SharedFlow<String> = _errors.asSharedFlow()
@@ -470,7 +475,7 @@ class DocumentDetailViewModel(
                             "The smallest it would go is ${formatMb(compiled.file.length() / BYTES_PER_MB.toFloat())} MB."
                     )
                 }
-                _pdfReady.emit(compiled.file)
+                _pdfReady.send(compiled.file)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: TextRecognitionUnavailableException) {
@@ -510,7 +515,7 @@ class DocumentDetailViewModel(
                 } finally {
                     exportSnapshotDir().deleteRecursively()
                 }
-                _imagesReady.emit(images)
+                _imagesReady.send(images)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

@@ -67,6 +67,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import com.papr.scanner.core.FileUtils
 import com.papr.scanner.domain.model.NormalizedPoint
 import com.papr.scanner.domain.model.Page
@@ -137,30 +140,37 @@ fun DocumentDetailScreen(
     LaunchedEffect(isEditingTitle) {
         if (isEditingTitle) titleFocus.requestFocus()
     }
+    // Only while the screen is started: Android won't open the share sheet from the background,
+    // so a finished export waits until the user is back.
+    val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(Unit) {
-        viewModel.pdfReady.collect { file ->
-            showExportOptions = false
-            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "application/pdf"
-                putExtra(Intent.EXTRA_STREAM, FileUtils.getShareableUri(context, file))
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.pdfReady.collect { file ->
+                showExportOptions = false
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/pdf"
+                    putExtra(Intent.EXTRA_STREAM, FileUtils.getShareableUri(context, file))
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(shareIntent, "Share PDF"))
             }
-            context.startActivity(Intent.createChooser(shareIntent, "Share PDF"))
         }
     }
     LaunchedEffect(Unit) {
-        viewModel.imagesReady.collect { files ->
-            showExportOptions = false
-            val uris = files.map { FileUtils.getShareableUri(context, it) }
-            val shareIntent = if (uris.size == 1) {
-                Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, uris.single())
-            } else {
-                Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
-            }.apply {
-                type = "image/jpeg"
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.imagesReady.collect { files ->
+                showExportOptions = false
+                val uris = files.map { FileUtils.getShareableUri(context, it) }
+                val shareIntent = if (uris.size == 1) {
+                    Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, uris.single())
+                } else {
+                    Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+                }.apply {
+                    type = "image/jpeg"
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(shareIntent, if (uris.size == 1) "Share image" else "Share images"))
             }
-            context.startActivity(Intent.createChooser(shareIntent, if (uris.size == 1) "Share image" else "Share images"))
         }
     }
     LaunchedEffect(Unit) {
