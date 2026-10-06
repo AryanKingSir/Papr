@@ -128,7 +128,7 @@ fun HomeScreen(
                         }
                     },
                     actions = {
-                        if (!isPro) {
+                        if (isPro == false) {
                             FilledTonalButton(
                                 onClick = onUpgradeClick,
                                 contentPadding = PaddingValues(start = 12.dp, end = 16.dp),

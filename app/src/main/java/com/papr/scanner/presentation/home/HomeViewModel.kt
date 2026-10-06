@@ -29,8 +29,11 @@ class HomeViewModel(
     isProFlow: Flow<Boolean>,
 ) : ViewModel() {
 
-    /** Pro owners don't need the "Pro" button in the top bar. */
-    val isPro: StateFlow<Boolean> = isProFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    /**
+     * Pro owners don't need the "Pro" button in the top bar. Null until it's known, so the button
+     * doesn't flash up for Pro owners while the setting loads.
+     */
+    val isPro: StateFlow<Boolean?> = isProFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val searchQuery = MutableStateFlow("")
     private val selectedFolder = MutableStateFlow<String?>(null)
