@@ -74,9 +74,11 @@ fun DocumentGridItem(
                 contentScale = ContentScale.Crop,
             )
             if (isContentMatch) {
+                // At the bottom: the selection check takes the top corner, and the badge is nearly
+                // as wide as the card.
                 Surface(
                     modifier = Modifier
-                        .align(Alignment.TopStart)
+                        .align(Alignment.BottomStart)
                         .padding(6.dp),
                     shape = RoundedCornerShape(6.dp),
                     color = MaterialTheme.colorScheme.primaryContainer,
