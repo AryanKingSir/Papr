@@ -405,7 +405,7 @@ class DocumentDetailViewModel(
                     _proSheetRequests.emit(usedUp.limitReachedMessage)
                     return@launch
                 }
-                val outputFile = fileMutex.withLock {
+                val compiled = fileMutex.withLock {
                     val document = documentRepository.getDocument(documentId) ?: return@launch
                     val pages = documentRepository.getPages(documentId)
                     if (pages.isEmpty()) return@launch
@@ -413,7 +413,7 @@ class DocumentDetailViewModel(
                         FileUtils.documentDir(appContext, documentId),
                         "${FileUtils.sanitizeFileName(document.title)}.pdf",
                     )
-                    pdfEngine.generatePdf(
+                    val result = pdfEngine.generatePdf(
                         pages.map { File(it.imageUri) },
                         exportFile,
                         PdfGenerationOptions(
@@ -438,11 +438,17 @@ class DocumentDetailViewModel(
                     // The file is named after the title, so after a rename the previous
                     // export would otherwise stay behind in the document's folder for good.
                     document.pdfUri?.takeIf { it != exportFile.absolutePath }?.let { File(it).delete() }
-                    exportFile
+                    result
                 }
                 // Only a finished export counts against the free plan's limits.
                 usageTracker.recordUse(features)
-                _pdfReady.emit(outputFile)
+                if (!compiled.metTarget) {
+                    _errors.emit(
+                        "Couldn't get it under ${formatMb(settings.targetSizeMb)} MB. " +
+                            "The smallest it would go is ${formatMb(compiled.file.length() / BYTES_PER_MB.toFloat())} MB."
+                    )
+                }
+                _pdfReady.emit(compiled.file)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: TextRecognitionUnavailableException) {
@@ -560,6 +566,8 @@ class DocumentDetailViewModel(
         const val MARKS_NEED_PRO = "Adding confidential marks needs Papr Pro."
     }
 }
+
+private fun formatMb(megabytes: Float) = "%.1f".format(megabytes)
 
 /** The limited features an export with [settings] uses - the password only counts when one is set, and images use none. */
 internal fun meteredFeaturesFor(settings: ExportSettings): Set<MeteredFeature> = buildSet {

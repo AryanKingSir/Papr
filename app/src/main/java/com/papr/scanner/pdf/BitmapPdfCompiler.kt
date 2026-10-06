@@ -14,6 +14,9 @@ import kotlin.math.sqrt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** A built PDF, and whether it came in at or under the requested size (always true when none was asked for). */
+data class CompiledPdf(val file: File, val metTarget: Boolean)
+
 class BitmapPdfCompiler {
 
     suspend fun compile(
@@ -31,7 +34,7 @@ class BitmapPdfCompiler {
         // Post-processes each freshly written file (e.g. adds a text layer, encrypts)
         // before its size is measured, so a target size covers the finished file.
         finish: suspend (File) -> Unit = {},
-    ): File = withContext(Dispatchers.IO) {
+    ): CompiledPdf = withContext(Dispatchers.IO) {
         // PdfDocument gives no direct control over embedded image size or
         // quality - the only lever that actually changes the written file's
         // size is the pixel dimensions of what's drawn on each page. So
@@ -41,17 +44,19 @@ class BitmapPdfCompiler {
         // encoded-byte-count proxy that has no reliable relationship to what
         // PdfDocument actually writes.
         var scale = 1f
+        var previousSize = Long.MAX_VALUE
         for (attempt in 0 until MAX_ATTEMPTS) {
             writePdf(pageFiles, outputFile, scale, preparePage, onPageDrawn)
             finish(outputFile)
-            // Written as two direct checks (not one `val` combining them) so the
-            // compiler can still smart-cast targetSizeBytes to non-null below -
-            // smart-casting doesn't see through an intermediate Boolean val.
-            if (targetSizeBytes == null || outputFile.length() <= targetSizeBytes) break
-            if (attempt == MAX_ATTEMPTS - 1) break
-            scale = nextScale(scale, targetSizeBytes, outputFile.length())
+            val size = outputFile.length()
+            if (targetSizeBytes == null || size <= targetSizeBytes) return@withContext CompiledPdf(outputFile, metTarget = true)
+            // Pages bottom out at MIN_DIMENSION, and the text layer doesn't shrink at all; once a
+            // rebuild stops getting smaller, more rebuilds only make the wait longer.
+            if (attempt == MAX_ATTEMPTS - 1 || size >= previousSize) break
+            previousSize = size
+            scale = nextScale(scale, targetSizeBytes, size)
         }
-        outputFile
+        CompiledPdf(outputFile, metTarget = false)
     }
 
     private suspend fun writePdf(
@@ -72,8 +77,11 @@ class BitmapPdfCompiler {
             val (pageWidthPx, pageHeightPx) = uniformPageSizePx(pageFiles)
             val pageWidthPt = (pageWidthPx * POINTS_PER_PIXEL).roundToInt()
             val pageHeightPt = (pageHeightPx * POINTS_PER_PIXEL).roundToInt()
+            // PdfDocument keeps a copy of every page's pixels until writeTo, so it's the whole
+            // document's pixel count that has to stay bounded, not just each page's.
+            val maxPixelsPerPage = TOTAL_PIXEL_BUDGET / pageFiles.size.coerceAtLeast(1)
             pageFiles.forEachIndexed { index, pageFile ->
-                val bitmap = decodeScaled(pageFile, scale)
+                val bitmap = decodeScaled(pageFile, scale, maxPixelsPerPage)
                 try {
                     preparePage(Canvas(bitmap), bitmap, index)
                     // Computed from the bitmap actually decoded, not predicted
@@ -116,10 +124,10 @@ class BitmapPdfCompiler {
 
     /**
      * Decodes a page as a mutable bitmap (so preparePage can draw on it), capped
-     * so a multi-page export of very high-res scans can't exhaust the heap, then
+     * so a multi-page export of very high-res scans can't exhaust memory, then
      * shrunk by [scale] (used to hit a compression target).
      */
-    private fun decodeScaled(pageFile: File, scale: Float): Bitmap {
+    private fun decodeScaled(pageFile: File, scale: Float, maxPixels: Long): Bitmap {
         val bounds = decodeBounds(pageFile)
         val sampleSize = sampleSizeFor(maxOf(bounds.outWidth, bounds.outHeight), MAX_PAGE_DIMENSION)
         val decoded = BitmapFactory.decodeFile(
@@ -129,7 +137,8 @@ class BitmapPdfCompiler {
                 inMutable = true
             },
         ) ?: throw IOException("Failed to decode bitmap: ${pageFile.absolutePath}")
-        val (width, height) = scaledSize(decoded.width, decoded.height, scale, MIN_DIMENSION)
+        val budgetScale = sqrt(maxPixels.toDouble() / (decoded.width.toLong() * decoded.height)).toFloat().coerceAtMost(1f)
+        val (width, height) = scaledSize(decoded.width, decoded.height, scale * budgetScale, MIN_DIMENSION)
         if (width == decoded.width && height == decoded.height) return decoded
         val scaled = decoded.scale(width, height)
         decoded.recycle()
@@ -143,6 +152,13 @@ class BitmapPdfCompiler {
     private companion object {
         /** Longest-side cap on decoded page bitmaps, to bound peak memory during multi-page export. */
         const val MAX_PAGE_DIMENSION = 3000
+
+        /**
+         * Pixels across all pages of one export (about 320 MB of native memory at 4 bytes each).
+         * Up to about 12 full-size pages fit; a 30-page document still gets about 1900 x 1400
+         * per page, plenty for text.
+         */
+        const val TOTAL_PIXEL_BUDGET = 80_000_000L
 
         /** How many times [compile] will rebuild the whole document while searching for a target size. */
         const val MAX_ATTEMPTS = 6

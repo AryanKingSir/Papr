@@ -27,8 +27,12 @@ class PdfEngine(
         pageFiles: List<File>,
         outputFile: File,
         options: PdfGenerationOptions = PdfGenerationOptions(),
-    ): File = withContext(Dispatchers.IO) {
+    ): CompiledPdf = withContext(Dispatchers.IO) {
         val ocrElementsByPage = mutableMapOf<Int, List<OcrTextElement>>()
+        // Each page is recognized once, on the first build, at its best resolution, and kept in
+        // units of that bitmap's width: a compression attempt shrinks the pages, and recognizing
+        // the shrunken images would lose words (and repeat the slow part on every attempt).
+        val recognizedByPage = mutableMapOf<Int, List<OcrTextElement>>()
 
         bitmapPdfCompiler.compile(
             pageFiles,
@@ -50,7 +54,10 @@ class PdfEngine(
                     // Injected as raw PDF operators, bypassing Canvas entirely - so
                     // placement applies the page's fit transform by hand (and flips Y,
                     // since PDF space is bottom-up while OcrTextStamper's boxes are top-down).
-                    ocrElementsByPage[pageIndex] = ocrTextStamper.recognize(bitmap).map { element ->
+                    val recognized = recognizedByPage.getOrPut(pageIndex) {
+                        ocrTextStamper.recognize(bitmap).map { it.scaledBy(1f / bitmap.width) }
+                    }
+                    ocrElementsByPage[pageIndex] = recognized.map { it.scaledBy(bitmap.width.toFloat()) }.map { element ->
                         element.copy(
                             x = placement.toPdfX(element.x),
                             y = placement.toPdfY(element.y),
@@ -75,7 +82,8 @@ class PdfEngine(
                 }
             },
         )
-
-        outputFile
     }
 }
+
+private fun OcrTextElement.scaledBy(factor: Float) =
+    copy(x = x * factor, y = y * factor, fontSize = fontSize * factor, width = width * factor)
