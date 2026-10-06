@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -79,6 +80,9 @@ fun PagePager(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp)
+                    // With gesture navigation, a stroke starting near the screen edge would be
+                    // taken as Back and close Markup; while drawing, the page is off limits to it.
+                    .then(if (markupTool != null || isPlacingSignature) Modifier.systemGestureExclusion() else Modifier)
                     .background(MaterialTheme.colorScheme.surfaceVariant),
             ) {
                 PageImage(
