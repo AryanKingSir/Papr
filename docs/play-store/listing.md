@@ -53,7 +53,7 @@ PRIVATE BY DESIGN
 • Your documents are never uploaded. They only leave your phone when you share them
 
 FREE, WITH AN OPTIONAL ONE-TIME UPGRADE
-Scanning, signing, markup, search, and plain PDF and image exports are free with no limits. Each month you also get 5 free uses each of searchable-text exports, password-protected exports, compressed exports, and merges.
+Scanning, signing, markup, search, and plain PDF and image exports are free with no limits. Each month you also get 3 free uses each of searchable-text exports, password-protected exports, compressed exports, and merges.
 Papr Pro is a single one-time purchase, with no subscription. It removes every monthly limit and unlocks confidential marking.
 
 Light and dark themes, and Material You colours on Android 12 and newer.

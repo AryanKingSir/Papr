@@ -53,16 +53,16 @@ class UsageTrackerTest {
         val tracker = newTracker()
         tracker.recordUse(setOf(MeteredFeature.OCR_EXPORT, MeteredFeature.PASSWORD_EXPORT))
 
-        assertEquals(4, tracker.remaining(MeteredFeature.OCR_EXPORT))
-        assertEquals(4, tracker.remaining(MeteredFeature.PASSWORD_EXPORT))
-        assertEquals(5, tracker.remaining(MeteredFeature.COMPRESSED_EXPORT))
-        assertEquals(5, tracker.remaining(MeteredFeature.MERGE))
+        assertEquals(2, tracker.remaining(MeteredFeature.OCR_EXPORT))
+        assertEquals(2, tracker.remaining(MeteredFeature.PASSWORD_EXPORT))
+        assertEquals(3, tracker.remaining(MeteredFeature.COMPRESSED_EXPORT))
+        assertEquals(3, tracker.remaining(MeteredFeature.MERGE))
     }
 
     @Test
-    fun `the fifth use leaves the feature used up`() = runTest {
+    fun `the third use leaves the feature used up`() = runTest {
         val tracker = newTracker()
-        repeat(4) { tracker.recordUse(setOf(MeteredFeature.MERGE)) }
+        repeat(2) { tracker.recordUse(setOf(MeteredFeature.MERGE)) }
         assertNull(tracker.firstUsedUp(setOf(MeteredFeature.MERGE)))
 
         tracker.recordUse(setOf(MeteredFeature.MERGE))
@@ -74,14 +74,14 @@ class UsageTrackerTest {
     @Test
     fun `a new month starts every count again`() = runTest {
         val tracker = newTracker()
-        repeat(5) { tracker.recordUse(setOf(MeteredFeature.MERGE)) }
+        repeat(3) { tracker.recordUse(setOf(MeteredFeature.MERGE)) }
         tracker.recordUse(setOf(MeteredFeature.OCR_EXPORT))
 
         now = millis(2026, Calendar.NOVEMBER, 1)
 
         assertNull(tracker.firstUsedUp(setOf(MeteredFeature.MERGE)))
-        assertEquals(5, tracker.remaining(MeteredFeature.MERGE))
-        assertEquals(5, tracker.remaining(MeteredFeature.OCR_EXPORT))
+        assertEquals(3, tracker.remaining(MeteredFeature.MERGE))
+        assertEquals(3, tracker.remaining(MeteredFeature.OCR_EXPORT))
     }
 
     @Test
@@ -93,14 +93,14 @@ class UsageTrackerTest {
         now = millis(2027, Calendar.JANUARY, 2)
         tracker.recordUse(setOf(MeteredFeature.MERGE))
 
-        assertEquals(4, tracker.remaining(MeteredFeature.MERGE))
-        assertEquals(5, tracker.remaining(MeteredFeature.OCR_EXPORT))
+        assertEquals(2, tracker.remaining(MeteredFeature.MERGE))
+        assertEquals(3, tracker.remaining(MeteredFeature.OCR_EXPORT))
     }
 
     @Test
     fun `pro is unlimited and never counted`() = runTest {
         val tracker = newTracker()
-        repeat(5) { tracker.recordUse(setOf(MeteredFeature.MERGE)) }
+        repeat(3) { tracker.recordUse(setOf(MeteredFeature.MERGE)) }
 
         isPro.value = true
         tracker.recordUse(setOf(MeteredFeature.OCR_EXPORT))
@@ -109,6 +109,6 @@ class UsageTrackerTest {
         assertNull(tracker.remaining(MeteredFeature.MERGE))
 
         isPro.value = false
-        assertEquals(5, tracker.remaining(MeteredFeature.OCR_EXPORT))
+        assertEquals(3, tracker.remaining(MeteredFeature.OCR_EXPORT))
     }
 }

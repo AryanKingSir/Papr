@@ -1,7 +1,7 @@
 package com.papr.scanner.usage
 
 /** How many times a month the free plan can use each [MeteredFeature]. Pro has no limit. */
-const val FREE_MONTHLY_LIMIT = 5
+const val FREE_MONTHLY_LIMIT = 3
 
 /** A feature the free plan can use [FREE_MONTHLY_LIMIT] times a month. */
 enum class MeteredFeature(private val usesName: String) {

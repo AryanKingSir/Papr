@@ -59,7 +59,7 @@ class UsageRulesTest {
     @Test
     fun `a free user has the limit minus what they used`() {
         val allowance = allowanceFor(MeteredFeature.OCR_EXPORT, mapOf(MeteredFeature.OCR_EXPORT to 2), isPro = false)
-        assertEquals(Allowance(remaining = 3, limit = FREE_MONTHLY_LIMIT), allowance)
+        assertEquals(Allowance(remaining = 1, limit = FREE_MONTHLY_LIMIT), allowance)
     }
 
     @Test
@@ -82,13 +82,13 @@ class UsageRulesTest {
 
     @Test
     fun `below the limit nothing is used up`() {
-        val counts = mapOf(MeteredFeature.OCR_EXPORT to 4, MeteredFeature.PASSWORD_EXPORT to 4)
+        val counts = mapOf(MeteredFeature.OCR_EXPORT to 2, MeteredFeature.PASSWORD_EXPORT to 2)
         assertNull(firstUsedUp(setOf(MeteredFeature.OCR_EXPORT, MeteredFeature.PASSWORD_EXPORT), counts, isPro = false))
     }
 
     @Test
     fun `at the limit the feature is used up`() {
-        val counts = mapOf(MeteredFeature.OCR_EXPORT to 4, MeteredFeature.PASSWORD_EXPORT to 5)
+        val counts = mapOf(MeteredFeature.OCR_EXPORT to 2, MeteredFeature.PASSWORD_EXPORT to 3)
         assertEquals(
             MeteredFeature.PASSWORD_EXPORT,
             firstUsedUp(setOf(MeteredFeature.OCR_EXPORT, MeteredFeature.PASSWORD_EXPORT), counts, isPro = false),
@@ -97,7 +97,7 @@ class UsageRulesTest {
 
     @Test
     fun `pro never runs out`() {
-        val counts = mapOf(MeteredFeature.MERGE to 5)
+        val counts = mapOf(MeteredFeature.MERGE to 3)
         assertNull(firstUsedUp(setOf(MeteredFeature.MERGE), counts, isPro = true))
     }
 
