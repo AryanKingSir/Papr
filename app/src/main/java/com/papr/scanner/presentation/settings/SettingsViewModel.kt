@@ -1,6 +1,7 @@
 package com.papr.scanner.presentation.settings
 
 import android.graphics.Bitmap
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.papr.scanner.billing.BillingManager
@@ -11,6 +12,7 @@ import com.papr.scanner.data.local.datastore.UserPreferencesRepository
 import com.papr.scanner.domain.model.AppSettings
 import com.papr.scanner.domain.model.ExportFormat
 import com.papr.scanner.domain.model.ThemeMode
+import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,16 +45,16 @@ class SettingsViewModel(
     private val _messages = MutableSharedFlow<String>()
     val messages: SharedFlow<String> = _messages.asSharedFlow()
 
-    fun setThemeMode(mode: ThemeMode) = viewModelScope.launch { preferences.setThemeMode(mode) }
+    fun setThemeMode(mode: ThemeMode) = save { preferences.setThemeMode(mode) }
 
-    fun setDynamicColor(enabled: Boolean) = viewModelScope.launch { preferences.setDynamicColor(enabled) }
+    fun setDynamicColor(enabled: Boolean) = save { preferences.setDynamicColor(enabled) }
 
-    fun setDeleteOriginalsAfterMerge(enabled: Boolean) = viewModelScope.launch { preferences.setDeleteOriginalsAfterMerge(enabled) }
+    fun setDeleteOriginalsAfterMerge(enabled: Boolean) = save { preferences.setDeleteOriginalsAfterMerge(enabled) }
 
-    fun setDefaultExportFormat(format: ExportFormat) = viewModelScope.launch { preferences.setDefaultExportFormat(format) }
+    fun setDefaultExportFormat(format: ExportFormat) = save { preferences.setDefaultExportFormat(format) }
 
     /** Replaces the saved signature with a freshly drawn one. */
-    fun saveSignature(signature: Bitmap) = viewModelScope.launch {
+    fun saveSignature(signature: Bitmap) = save {
         try {
             savedSignatureStore.save(signature)
         } finally {
@@ -60,7 +62,17 @@ class SettingsViewModel(
         }
     }
 
-    fun removeSignature() = viewModelScope.launch { savedSignatureStore.delete() }
+    fun removeSignature() = save { savedSignatureStore.delete() }
+
+    /** Runs a write, turning a storage failure (a full disk, say) into a message instead of a crash. */
+    private fun save(write: suspend () -> Unit) = viewModelScope.launch {
+        try {
+            write()
+        } catch (e: IOException) {
+            Log.e("Papr", "Couldn't save a setting", e)
+            _messages.emit("Couldn't save that. Free up some storage and try again.")
+        }
+    }
 
     /**
      * Connecting re-checks the Google account's purchases and unlocks Pro if it
