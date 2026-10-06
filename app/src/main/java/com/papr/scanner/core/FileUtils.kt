@@ -23,6 +23,10 @@ object FileUtils {
     private const val MAX_ROTATE_DIMENSION = 4000
     private const val MAX_FILENAME_LENGTH = 100
 
+    // Android allows 255 bytes per file name, and a long Hindi title is 3 bytes a letter; this
+    // leaves room for the "-12.jpg" or ".pdf" that's added after it.
+    private const val MAX_FILENAME_BYTES = 200
+
     // Characters invalid (or awkward) across Android's FUSE/FAT-derived storage,
     // plus control characters - anything else in a title is left alone.
     private val ILLEGAL_FILENAME_CHARS = Regex("[/\\\\:*?\"<>|\\x00-\\x1F]")
@@ -52,7 +56,21 @@ object FileUtils {
     /** Turns a document title into a safe file base name (no extension), for use in exported/shared file names. */
     fun sanitizeFileName(title: String): String {
         val cleaned = title.trim().replace(ILLEGAL_FILENAME_CHARS, " ").replace(WHITESPACE_RUN, " ").trim()
-        return cleaned.ifEmpty { "Document" }.take(MAX_FILENAME_LENGTH)
+        return cleaned.ifEmpty { "Document" }.take(MAX_FILENAME_LENGTH).takeUtf8Bytes(MAX_FILENAME_BYTES).trim()
+    }
+
+    /** The longest whole-character prefix that fits in [maxBytes] of UTF-8 (never half an emoji). */
+    private fun String.takeUtf8Bytes(maxBytes: Int): String {
+        var bytes = 0
+        var end = 0
+        while (end < length) {
+            val codePoint = codePointAt(end)
+            val size = String(Character.toChars(codePoint)).toByteArray(Charsets.UTF_8).size
+            if (bytes + size > maxBytes) break
+            bytes += size
+            end += Character.charCount(codePoint)
+        }
+        return substring(0, end)
     }
 
     /** Rotates a page image file in place; downstream consumers (PDF export, thumbnails) just re-read it. */
