@@ -40,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -89,6 +90,8 @@ fun OrganizePagesScreen(
     val haptics = LocalPaprHaptics.current
     val dragTip = rememberTip(Tip.ORGANIZE_DRAG)
     LaunchedEffect(pages) { if (!isDragging) order = pages }
+    // The drag callbacks are kept from when a page's gesture began, which can be a reorder ago.
+    val currentPages by rememberUpdatedState(pages)
 
     var selecting by rememberSaveable { mutableStateOf(false) }
     var selected by rememberSaveable(stateSaver = PageIdsSaver) { mutableStateOf(setOf<Long>()) }
@@ -203,7 +206,7 @@ fun OrganizePagesScreen(
                                         isDragging = false
                                         val orderedIds = order.map { it.id }
                                         // Only a page that actually moved gets the "done" feel.
-                                        if (orderedIds != pages.map { it.id }) haptics.perform(Haptic.CONFIRM)
+                                        if (orderedIds != currentPages.map { it.id }) haptics.perform(Haptic.CONFIRM)
                                         onReorder(orderedIds)
                                     },
                                 ),
