@@ -36,4 +36,20 @@ class PageOrderTest {
 
         assertEquals(listOf(page(12, 0), page(10, 1), page(11, 2)), changed)
     }
+
+    @Test
+    fun `moving a page earlier swaps it with the one before`() {
+        assertEquals(listOf(10L, 12L, 11L, 13L), idsWithPageMoved(listOf(10L, 11L, 12L, 13L), index = 2, step = -1))
+    }
+
+    @Test
+    fun `moving a page later swaps it with the one after`() {
+        assertEquals(listOf(11L, 10L, 12L, 13L), idsWithPageMoved(listOf(10L, 11L, 12L, 13L), index = 0, step = 1))
+    }
+
+    @Test
+    fun `a page can't move past either end`() {
+        assertEquals(listOf(10L, 11L), idsWithPageMoved(listOf(10L, 11L), index = 1, step = 1))
+        assertEquals(listOf(10L, 11L), idsWithPageMoved(listOf(10L, 11L), index = 0, step = -1))
+    }
 }

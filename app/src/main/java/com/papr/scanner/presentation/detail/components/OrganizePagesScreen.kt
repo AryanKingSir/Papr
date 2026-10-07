@@ -49,7 +49,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.papr.scanner.domain.model.Page
 import com.papr.scanner.domain.model.Tip
@@ -60,6 +63,7 @@ import com.papr.scanner.presentation.common.SelectionCheck
 import com.papr.scanner.presentation.common.TipCard
 import com.papr.scanner.presentation.common.ToolButton
 import com.papr.scanner.presentation.common.rememberTip
+import com.papr.scanner.presentation.detail.idsWithPageMoved
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyGridState
 
@@ -102,6 +106,14 @@ fun OrganizePagesScreen(
     val reorderState = rememberReorderableLazyGridState(gridState) { from, to ->
         order = order.toMutableList().apply { add(to.index, removeAt(from.index)) }
         haptics.perform(Haptic.TICK)
+    }
+
+    fun movePage(index: Int, step: Int): Boolean {
+        val ids = idsWithPageMoved(order.map { it.id }, index, step)
+        if (ids == order.map { it.id }) return false
+        order = ids.mapNotNull { id -> order.firstOrNull { it.id == id } }
+        onReorder(ids)
+        return true
     }
 
     Scaffold(
@@ -220,6 +232,17 @@ fun OrganizePagesScreen(
                                             ),
                                             RoundedCornerShape(8.dp),
                                         )
+                                        // Dragging needs a held finger, which TalkBack and Switch Access
+                                        // can't give - so pages also move one step at a time from its actions menu.
+                                        .semantics {
+                                            if (!selecting) {
+                                                val moves = buildList {
+                                                    if (index > 0) add(CustomAccessibilityAction("Move earlier") { movePage(index, -1) })
+                                                    if (index < order.lastIndex) add(CustomAccessibilityAction("Move later") { movePage(index, 1) })
+                                                }
+                                                customActions = moves
+                                            }
+                                        }
                                         .clickable(role = if (selecting) Role.Checkbox else Role.Button) {
                                             if (selecting) {
                                                 haptics.toggle(on = !isSelected)

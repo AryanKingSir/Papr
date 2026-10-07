@@ -666,6 +666,13 @@ private fun Page.markupSnapshot() = MarkupSnapshot(annotations, confidentialMark
  * order, renumbered 0..n-1. Ids that aren't pages any more are skipped, and
  * pages missing from [orderedIds] (added meanwhile) keep their order at the end.
  */
+/** [ids] with the page at [index] moved [step] places (-1 earlier, 1 later), unchanged at either end. */
+internal fun idsWithPageMoved(ids: List<Long>, index: Int, step: Int): List<Long> {
+    val target = index + step
+    if (index !in ids.indices || target !in ids.indices) return ids
+    return ids.toMutableList().apply { add(target, removeAt(index)) }
+}
+
 internal fun pagesInNewOrder(pages: List<Page>, orderedIds: List<Long>): List<Page> {
     val byId = pages.associateBy { it.id }
     val ordered = orderedIds.mapNotNull { byId[it] }
