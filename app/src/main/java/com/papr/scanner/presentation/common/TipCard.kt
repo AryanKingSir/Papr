@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -52,6 +53,10 @@ fun rememberTip(tip: Tip): TipState {
     val container = (LocalContext.current.applicationContext as PaprApplication).container
     val onboarding by container.onboardingState.collectAsState()
     var dismissedHere by rememberSaveable(tip) { mutableStateOf(false) }
+    // Only bridges the moment until the stored state says seen; after that the store decides, so
+    // Settings > Show the tour again brings the tip back even on a screen still in the back stack.
+    val seen = onboarding?.seenTips?.contains(tip)
+    LaunchedEffect(seen) { if (seen == true) dismissedHere = false }
     return remember(tip) {
         TipState(
             visible = { !dismissedHere && onboarding?.seenTips?.contains(tip) == false },
