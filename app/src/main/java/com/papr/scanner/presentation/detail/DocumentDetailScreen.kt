@@ -121,6 +121,7 @@ fun DocumentDetailScreen(
             container.pageImageExporter,
             container.usageTracker,
             container.savedSignatureStore,
+            container.pageTextExtractor,
             container.userPreferencesRepository.settings.map { it.defaultExportFormat },
             container.appContext,
         )

@@ -23,6 +23,23 @@ class PageTextExtractor(
     }
 
     /**
+     * Reads [pages] again after they were turned. Text recognition reads upright text best, so a
+     * page scanned sideways and turned upright gets found by search; a page turned away from
+     * upright keeps the better text it had.
+     */
+    fun reExtractRotatedInBackground(pages: List<Page>) {
+        scope.launch {
+            for (page in pages) {
+                try {
+                    extractAndSave(page) { recognized -> textWorthSavingAfterRotation(page.extractedText, recognized) }
+                } catch (e: TextRecognitionUnavailableException) {
+                    return@launch
+                }
+            }
+        }
+    }
+
+    /**
      * Catches up on pages whose OCR never succeeded - e.g. scanned while the
      * text-recognition model was still downloading right after install, which
      * is exactly when a new user scans their first document.
@@ -44,7 +61,7 @@ class PageTextExtractor(
         }
     }
 
-    private suspend fun extractAndSave(page: Page) {
+    private suspend fun extractAndSave(page: Page, toSave: (recognized: String) -> String? = { it }) {
         try {
             val file = File(page.imageUri)
             // Deleted or replaced before OCR got to it - nothing left to index.
@@ -56,7 +73,8 @@ class PageTextExtractor(
                 bitmap.recycle()
             }
             // "" (not null) when nothing was found, so it isn't retried as "never indexed".
-            documentRepository.updateExtractedText(page.id, page.imageUri, text.trim())
+            val saved = toSave(text.trim()) ?: return
+            documentRepository.updateExtractedText(page.id, page.imageUri, saved)
         } catch (e: CancellationException) {
             throw e
         } catch (e: TextRecognitionUnavailableException) {
@@ -71,3 +89,7 @@ class PageTextExtractor(
         const val MAX_DIMENSION = 3000
     }
 }
+
+/** What to store after re-reading a turned page: the new reading if it found more, otherwise nothing (keep [previous]). */
+internal fun textWorthSavingAfterRotation(previous: String?, recognized: String): String? =
+    recognized.takeIf { previous == null || it.length > previous.length }

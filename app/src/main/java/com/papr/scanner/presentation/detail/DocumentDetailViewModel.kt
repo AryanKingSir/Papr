@@ -19,6 +19,7 @@ import com.papr.scanner.domain.model.defaultSignaturePlacement
 import com.papr.scanner.domain.model.rotatedClockwise
 import com.papr.scanner.pdf.PageImageExporter
 import com.papr.scanner.pdf.PageOverlays
+import com.papr.scanner.pdf.PageTextExtractor
 import com.papr.scanner.pdf.PasswordProtection
 import com.papr.scanner.pdf.PdfEngine
 import com.papr.scanner.pdf.PdfGenerationOptions
@@ -64,6 +65,7 @@ class DocumentDetailViewModel(
     private val pageImageExporter: PageImageExporter,
     private val usageTracker: UsageTracker,
     private val savedSignatureStore: SavedSignatureStore,
+    private val pageTextExtractor: PageTextExtractor,
     defaultExportFormatFlow: Flow<ExportFormat>,
     private val appContext: Context,
 ) : ViewModel() {
@@ -198,6 +200,7 @@ class DocumentDetailViewModel(
 
     fun rotatePages(pageIds: Collection<Long>) {
         launchEdit("Couldn't rotate the page") {
+            val turned = mutableListOf<Page>()
             for (pageId in pageIds) {
                 val page = documentRepository.getPage(pageId) ?: continue
                 val file = File(page.imageUri)
@@ -216,8 +219,10 @@ class DocumentDetailViewModel(
                 refreshThumbnailIfFirst(rotated)
                 // Per page, so a long batch shows each page turn as it's done rather than all at the end.
                 localState.update { it.copy(revision = it.revision + 1) }
+                turned += rotated
             }
             touchDocument()
+            pageTextExtractor.reExtractRotatedInBackground(turned)
         }
     }
 
