@@ -9,7 +9,10 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -110,5 +113,20 @@ class UsageTrackerTest {
 
         isPro.value = false
         assertEquals(3, tracker.remaining(MeteredFeature.OCR_EXPORT))
+    }
+
+    @Test
+    fun `a screen left open into a new month sees the new month's allowance`() = runTest {
+        val tracker = newTracker()
+        repeat(3) { tracker.recordUse(setOf(MeteredFeature.MERGE)) }
+        var latest: Map<MeteredFeature, Allowance>? = null
+        backgroundScope.launch { tracker.allowances.collect { latest = it } }
+        runCurrent()
+        assertEquals(0, latest?.getValue(MeteredFeature.MERGE)?.remaining)
+
+        now = millis(2026, Calendar.NOVEMBER, 1)
+        advanceTimeBy(2 * 60_000L)
+
+        assertEquals(FREE_MONTHLY_LIMIT, latest?.getValue(MeteredFeature.MERGE)?.remaining)
     }
 }

@@ -4,9 +4,12 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 
 /**
  * Counts the free plan's monthly uses of each [MeteredFeature] - the one place
@@ -19,8 +22,17 @@ class UsageTracker(
     // Injectable so tests can move to another month.
     private val now: () -> Long = System::currentTimeMillis,
 ) {
-    val allowances: Flow<Map<MeteredFeature, Allowance>> = combine(dataStore.data, isPro) { prefs, isPro ->
-        val counts = currentCounts(prefs)
+    // The month, checked once a minute while a screen is watching: a screen left open over the end
+    // of a month (or a clock set forward) must not keep showing last month's used-up features.
+    private val currentMonth: Flow<Int> = flow {
+        while (true) {
+            emit(monthKey(now()))
+            delay(MONTH_CHECK_INTERVAL_MS)
+        }
+    }.distinctUntilChanged()
+
+    val allowances: Flow<Map<MeteredFeature, Allowance>> = combine(dataStore.data, isPro, currentMonth) { prefs, isPro, month ->
+        val counts = currentCounts(prefs, month)
         MeteredFeature.entries.associateWith { allowanceFor(it, counts, isPro) }
     }
 
@@ -49,6 +61,7 @@ class UsageTracker(
 
     private companion object {
         val USAGE_MONTH = intPreferencesKey("usage_month")
+        const val MONTH_CHECK_INTERVAL_MS = 60_000L
 
         fun countKey(feature: MeteredFeature) = intPreferencesKey("usage_${feature.name.lowercase()}")
     }
