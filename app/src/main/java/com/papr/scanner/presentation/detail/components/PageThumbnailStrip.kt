@@ -21,6 +21,8 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.papr.scanner.domain.model.Page
 import com.papr.scanner.presentation.common.PageImage
@@ -72,7 +74,8 @@ fun PageThumbnailStrip(
                             ),
                             RoundedCornerShape(8.dp),
                         )
-                        .clickable { onPageSelected(index) },
+                        .clickable { onPageSelected(index) }
+                        .semantics { selected = isSelected },
                 ) {
                     PageThumbnail(page = page, contentDescription = "Page ${index + 1}", modifier = Modifier.fillMaxSize())
                 }

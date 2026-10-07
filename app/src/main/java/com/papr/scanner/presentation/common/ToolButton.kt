@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,7 +60,11 @@ fun ToolButton(
             .widthIn(min = 56.dp)
             .clip(RoundedCornerShape(12.dp))
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .semantics { if (locked) stateDescription = "Needs Papr Pro" }
+            .semantics {
+                // So TalkBack says which tool is the active one, not only how it looks.
+                this.selected = selected
+                if (locked) stateDescription = "Needs Papr Pro"
+            }
             .padding(horizontal = 4.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
