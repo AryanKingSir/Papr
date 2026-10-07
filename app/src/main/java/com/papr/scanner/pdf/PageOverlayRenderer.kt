@@ -73,6 +73,17 @@ class PageOverlayRenderer(
             local.y in (anchorY - slopPx)..(anchorY + textHeight + slopPx)
     }
 
+    /** [note]'s box around its anchor on a page drawn at [widthPx]x[heightPx], measured with the paint it's drawn with. */
+    fun textNoteBox(note: TextNote, widthPx: Int, heightPx: Int): NoteBox {
+        val paint = textPaint(note, widthPx, heightPx)
+        val lines = note.text.split('\n')
+        return noteBoxAroundAnchor(
+            textWidth = lines.maxOf { paint.measureText(it) },
+            textHeight = lines.size * paint.textSize * LINE_HEIGHT,
+            quarterTurns = note.quarterTurns,
+        )
+    }
+
     private fun drawStroke(canvas: Canvas, stroke: InkStroke, widthPx: Int, heightPx: Int) {
         if (stroke.points.size < 2) return
         val path = Path()

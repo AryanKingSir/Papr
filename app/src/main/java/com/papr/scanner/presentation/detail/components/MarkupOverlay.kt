@@ -15,6 +15,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.PointerInputScope
@@ -34,6 +35,7 @@ import com.papr.scanner.domain.model.TextNote
 import com.papr.scanner.domain.model.widthFraction
 import com.papr.scanner.pdf.FittedBounds
 import com.papr.scanner.pdf.PageOverlayRenderer
+import com.papr.scanner.pdf.anchorKeepingBoxOnPage
 import com.papr.scanner.pdf.fittedImageBounds
 import com.papr.scanner.pdf.isOnInkStroke
 import com.papr.scanner.pdf.isPointNearStroke
@@ -109,6 +111,15 @@ fun MarkupOverlay(
         null
     }
 
+    // Where [note] lands moved by [moved] (screen pixels), kept wholly on the page: exports draw
+    // onto the page image alone, so any part past its edge would be cut off there.
+    fun FittedBounds.movedNote(note: TextNote, moved: Offset): TextNote {
+        val box = renderer.textNoteBox(note, width.toInt(), height.toInt())
+        val x = anchorKeepingBoxOnPage(note.x * width + moved.x, box.minX, box.maxX, width) / width
+        val y = anchorKeepingBoxOnPage(note.y * height + moved.y, box.minY, box.maxY, height) / height
+        return note.copy(x = x.coerceIn(0f, 1f), y = y.coerceIn(0f, 1f))
+    }
+
     fun FittedBounds.noteAt(offset: Offset): TextNote? = currentAnnotations.filterIsInstance<TextNote>().lastOrNull {
         renderer.isOnTextNote(it, offset.x - left, offset.y - top, width.toInt(), height.toInt(), slopPx)
     }
@@ -142,11 +153,8 @@ fun MarkupOverlay(
                     }
                     if (finished) {
                         savingMove = note to moved
-                        currentOnTextMoved(
-                            note,
-                            (note.x + moved.x / bounds.width).coerceIn(0f, 1f),
-                            (note.y + moved.y / bounds.height).coerceIn(0f, 1f),
-                        )
+                        val placed = bounds.movedNote(note, moved)
+                        currentOnTextMoved(note, placed.x, placed.y)
                     }
                     dragging = null
                 }
@@ -208,10 +216,7 @@ fun MarkupOverlay(
             .filterNot { it in erasing || it in savingErased }
             .map { annotation ->
                 if (moving != null && annotation == moving.first) {
-                    moving.first.copy(
-                        x = moving.first.x + moving.second.x / fitted.width,
-                        y = moving.first.y + moving.second.y / fitted.height,
-                    )
+                    fitted.movedNote(moving.first, moving.second)
                 } else {
                     annotation
                 }
@@ -219,9 +224,12 @@ fun MarkupOverlay(
             .plus(savingStrokes)
             .let { if (live != null) it + live else it }
         if (shown.isEmpty()) return@Canvas
-        drawIntoCanvas { canvas ->
-            canvas.nativeCanvas.withTranslation(fitted.left, fitted.top) {
-                renderer.drawAnnotations(this, shown, fitted.width.toInt(), fitted.height.toInt())
+        // Clipped to the image, as the export is: a note running off the page shows cut off here too.
+        clipRect(fitted.left, fitted.top, fitted.left + fitted.width, fitted.top + fitted.height) {
+            drawIntoCanvas { canvas ->
+                canvas.nativeCanvas.withTranslation(fitted.left, fitted.top) {
+                    renderer.drawAnnotations(this, shown, fitted.width.toInt(), fitted.height.toInt())
+                }
             }
         }
     }
