@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -109,33 +111,62 @@ fun WelcomeScreen(onFinish: () -> Unit) {
 
 @Composable
 private fun SlideContent(slide: Slide) {
-    // Scrolls on short or landscape screens and with large text, instead of clipping the words.
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 32.dp),
-    ) {
-        SlideArt(slide.icon)
-        Spacer(modifier = Modifier.height(40.dp))
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        // A wide, short slide (landscape) puts the art beside the words: stacked, the words
+        // would sit below the bottom edge with nothing to say they're there.
+        if (maxWidth > maxHeight && maxHeight < STACKED_MIN_HEIGHT) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 32.dp),
+            ) {
+                SlideArt(slide.icon)
+                Spacer(modifier = Modifier.width(40.dp))
+                SlideText(slide, TextAlign.Start, Modifier.weight(1f, fill = false))
+            }
+        } else {
+            // Scrolls on short screens and with large text, instead of clipping the words.
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 32.dp),
+            ) {
+                SlideArt(slide.icon)
+                Spacer(modifier = Modifier.height(40.dp))
+                SlideText(slide, TextAlign.Center)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SlideText(slide: Slide, align: TextAlign, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.widthIn(max = 420.dp)) {
         Text(
             slide.title,
             style = MaterialTheme.typography.headlineMedium,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.widthIn(max = 420.dp),
+            textAlign = align,
+            modifier = Modifier.fillMaxWidth(),
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
             slide.body,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.widthIn(max = 420.dp),
+            textAlign = align,
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
+
+/** Below this height the art and words don't fit stacked: 200dp of art, a 40dp gap, and about four lines. */
+private val STACKED_MIN_HEIGHT = 380.dp
 
 /** The icon on a tinted disc, with a tilted sheet behind it - the two sheets of the app icon. */
 @Composable
