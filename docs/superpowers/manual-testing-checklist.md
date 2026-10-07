@@ -197,3 +197,21 @@ The scan review screen (Retake / Delete / Next / Add page) is Google's ML Kit sc
 6. A locked export option opens the Pro sheet over the export sheet; closing it goes back to the export sheet. ✓ emulator 2026-10-06
 7. Settings > Haptics (on by default) is saved across restarts. ✓ emulator 2026-10-06
 8. **moto g13 (by hand):** haptics on - a long-press to select, select toggles (Home, Organize), Organize pickup / a tick per page passed / a click on drop (nothing if the page didn't move), markup tool change, undo/redo, signature saved, delete confirmed, export ready, merge done, scan saved, every switch, an error toast, a locked or Pro-only tap (a "no" buzz). Haptics off: all of these are silent, including the long-press.
+
+## 15. Second deep check before the Play upload (2026-10-07)
+
+A second audit, organised by user journey this time (first launch, scan, edit, pages, export, Home, Pro and Settings, plus the 12e4150 diff and Play policy), every finding re-checked by an independent verifier: 39 confirmed (merged into 29), 1 rejected. Plus device sweeps of the release build on the **Pixel 10a emulator, Android 17** and the Android 12 emulator: first launch, light/dark, font 2.0, landscape, process death, and 4000-event monkey runs on both (no crash, no ANR). The fixes are commits 838b1fa..e0c8f71; store screenshots retaken in 6252229. Items marked **✓ emulator 2026-10-07** were checked there.
+
+1. Leaving the editor during a long export, then exporting again (same or another document), works - no "Export failed", and the shared file is the new one. ✓ emulator 2026-10-07 (27-page document)
+2. A password + compressed export of a 27-page document reaches the share sheet; a huge password/OCR export no longer runs out of memory (unit test with a 140 MB PDF under a 512 MB heap). ✓ emulator 2026-10-07
+3. The scanner's own copies of scanned pages (cache/mlkit_docscan_ui_client) are deleted once imported. ✓ emulator 2026-10-07 (debug build: folder empty after a scan)
+4. Gesture navigation: a pen stroke starting at the page's left or right edge, at any height, draws and stays in Markup; dragging the signature's resize handle by the right edge resizes it and stays in Sign. The page is inset by the Back-gesture zones. ✓ emulator 2026-10-07 (Android 17, 30dp zones)
+5. Markup on a 360dp-wide phone: all 4 colours and 3 sizes fit at 48dp, Undo/Redo are in the top bar. ✓ emulator 2026-10-07 (wm density 480)
+6. Organize: deleting pages 1-2 while viewing page 6 keeps that page on screen (now "Page 4"). ✓ emulator 2026-10-07
+7. Settings > Show the tour again, then Back on the first slide: next cold start opens Home, not the slides. ✓ emulator 2026-10-07
+8. Welcome slides in landscape show the art beside the words. ✓ emulator 2026-10-07 (font 2.0 scrolls)
+9. Rotating with Home's filter sheet or the "Delete ...?" dialog open keeps them open; a signature drawn in landscape survives turning to portrait. ✓ emulator 2026-10-07
+10. Process death with the export sheet (password on), Organize select mode (2 selected) or the signature pad (strokes) open: each comes back as it was. ✓ emulator 2026-10-07
+11. TalkBack: Home's Scan button reads "Scan"; markup tools and the current page thumbnail say "selected"; the compression slider reads "Target size, 1.0 MB"; Organize pages offer Move earlier / Move later; document titles are read once. ✓ emulator 2026-10-07 (Scan label via uiautomator); the rest need TalkBack by hand.
+12. Not device-tested (unit tests or code only): text notes kept on the page when dragged, rotated pages re-read for search, Back blocked while merging, month rollover refreshing the free allowances, a scan hidden from Home until saved, haptics silenced in the note dialog and password field, Pro row in Settings not flashing "Free plan", adjustResize on Android 7-10.
+13. **Still needs the user:** everything in 13.14 and 13.15 (Play testing track purchase/pending/refund, real-camera scan, drawing feel, printing) and 14.8 (haptics by hand on the moto g13).
