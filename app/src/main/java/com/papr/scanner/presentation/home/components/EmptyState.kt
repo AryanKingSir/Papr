@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material3.Button
@@ -13,13 +15,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 @Composable
 fun EmptyState(onScanClick: () -> Unit, modifier: Modifier = Modifier) {
     Column(
+        // Scrolls (still centred when it fits) so a landscape screen or large text can't cut it off.
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -37,6 +42,7 @@ fun EmptyState(onScanClick: () -> Unit, modifier: Modifier = Modifier) {
         Text(
             text = "Scan a page to create your first document.",
             style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
         )
         Button(onClick = onScanClick) {
@@ -49,8 +55,10 @@ fun EmptyState(onScanClick: () -> Unit, modifier: Modifier = Modifier) {
 @Composable
 fun NoMatchesState(modifier: Modifier = Modifier) {
     Column(
+        // Scrolls (still centred when it fits) so a landscape screen or large text can't cut it off.
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -62,6 +70,7 @@ fun NoMatchesState(modifier: Modifier = Modifier) {
         Text(
             text = "Try a different search, or clear the filters.",
             style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 8.dp),
         )
     }
