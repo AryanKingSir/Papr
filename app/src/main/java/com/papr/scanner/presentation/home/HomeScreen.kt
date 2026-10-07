@@ -206,7 +206,8 @@ fun HomeScreen(
             if (!uiState.isSelectionMode) {
                 ExtendedFloatingActionButton(
                     onClick = onScanClick,
-                    icon = { Icon(Icons.Default.DocumentScanner, contentDescription = null) },
+                    // Material's extended FAB hides its text from TalkBack and takes its name from the icon.
+                    icon = { Icon(Icons.Default.DocumentScanner, contentDescription = "Scan") },
                     text = { Text("Scan") },
                 )
             }
