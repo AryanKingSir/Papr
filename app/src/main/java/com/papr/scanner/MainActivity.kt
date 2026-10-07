@@ -71,13 +71,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         pendingScanTarget = restoreScanTarget(savedInstanceState)
         enableEdgeToEdge()
-        if (savedInstanceState == null) {
-            // Checks the purchase with Google Play on every app start, not only when the paywall
-            // opens: a payment that went through later gets acknowledged before Play's three-day
-            // auto-refund, and a refunded Pro is turned off.
-            container.applicationScope.launch { container.billingManager.connect() }
-        }
-
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 container.scanImporter.events.collect { event ->

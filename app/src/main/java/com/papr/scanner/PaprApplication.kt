@@ -15,6 +15,11 @@ class PaprApplication : Application() {
         super.onCreate()
         container = AppContainer(this)
         container.pageTextExtractor.extractMissingInBackground()
+        // Checks the purchase with Google Play once per process, not only when the paywall opens:
+        // a payment that went through later gets acknowledged before Play's three-day auto-refund,
+        // and a refunded Pro is turned off. Here rather than in MainActivity, whose saved state
+        // can't tell a rotation from Android restoring the app after killing it in the background.
+        container.applicationScope.launch { container.billingManager.connect() }
         removeUnfinishedDocuments()
         removeAbandonedExportCopies()
     }
