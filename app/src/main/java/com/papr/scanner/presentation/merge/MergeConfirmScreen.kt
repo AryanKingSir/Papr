@@ -1,5 +1,6 @@
 package com.papr.scanner.presentation.merge
 
+import androidx.activity.compose.BackHandler
 import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -101,12 +102,15 @@ fun MergeConfirmScreen(
         }
     }
 
+    // Leaving would cancel the merge halfway and quietly throw away the new document.
+    BackHandler(enabled = uiState.isMerging) {}
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Merge documents") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = onBack, enabled = !uiState.isMerging) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
