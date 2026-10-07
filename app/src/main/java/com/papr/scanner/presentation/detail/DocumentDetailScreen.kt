@@ -346,7 +346,12 @@ fun DocumentDetailScreen(
                     .fillMaxWidth(),
             )
 
-            TipCard(tip = markupTip, text = "Pick a tool, then draw on the page with your finger.", visible = inMarkup)
+            // The Text tool has its own how-to below, shown in the tip's place.
+            TipCard(
+                tip = markupTip,
+                text = "Pick a tool, then draw on the page with your finger.",
+                visible = inMarkup && uiState.markupTool != MarkupTool.TEXT,
+            )
             when {
                 uiState.isPlacingSignature -> HintRow("Drag the signature to move it. Drag its corner to resize.")
                 uiState.mode == EditorMode.SIGN -> HintRow(
@@ -356,8 +361,7 @@ fun DocumentDetailScreen(
                         "Draw your signature, then drag it into place."
                     }
                 )
-                // After the Markup tip, so the two never stack.
-                inMarkup && uiState.markupTool == MarkupTool.TEXT && !markupTip.visible ->
+                inMarkup && uiState.markupTool == MarkupTool.TEXT ->
                     HintRow("Tap to add text. Tap text to edit it, drag to move it.")
             }
 
@@ -517,6 +521,7 @@ fun DocumentDetailScreen(
                 if (existing != null) {
                     viewModel.saveTextNote(request.pageId, existing, existing.copy(text = text))
                 } else {
+                    markupTip.dismiss()
                     val style = uiState.toolStyles[MarkupTool.TEXT] ?: MarkupTool.TEXT.defaultStyle()
                     viewModel.saveTextNote(
                         request.pageId,
