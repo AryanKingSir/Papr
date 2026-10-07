@@ -7,7 +7,7 @@ data class ByteRange(val start: Int, val end: Int)
 data class EncryptableObject(val number: Int, val generation: Int, val ranges: List<ByteRange>)
 
 /**
- * Walks a PDF's bytes (decoded 1:1 via ISO-8859-1, so char index == byte
+ * Walks a PDF's bytes (read 1:1 as ISO-8859-1, so char index == byte
  * index) to find every indirect object and the byte ranges inside it that
  * the Standard Security Handler must encrypt: either its one stream body
  * (located via its own /Length, never by searching for the literal
@@ -23,7 +23,7 @@ data class EncryptableObject(val number: Int, val generation: Int, val ranges: L
  */
 class PdfObjectScanner {
 
-    fun scan(text: String): List<EncryptableObject> {
+    fun scan(text: CharSequence): List<EncryptableObject> {
         val objects = mutableListOf<EncryptableObject>()
         for (match in OBJECT_HEADER_REGEX.findAll(text)) {
             val number = match.groupValues[1].toInt()
@@ -45,7 +45,7 @@ class PdfObjectScanner {
         return objects
     }
 
-    private fun findStreamRange(text: String, bodyStart: Int, bodyEnd: Int): ByteRange? {
+    private fun findStreamRange(text: CharSequence, bodyStart: Int, bodyEnd: Int): ByteRange? {
         val streamKeywordAt = text.indexOf("stream", bodyStart)
         if (streamKeywordAt == -1 || streamKeywordAt >= bodyEnd) return null
 
@@ -60,7 +60,7 @@ class PdfObjectScanner {
         return ByteRange(dataStart, dataStart + length)
     }
 
-    private fun findLiteralStringRanges(text: String, bodyStart: Int, bodyEnd: Int): List<ByteRange> {
+    private fun findLiteralStringRanges(text: CharSequence, bodyStart: Int, bodyEnd: Int): List<ByteRange> {
         val ranges = mutableListOf<ByteRange>()
         var i = bodyStart
         while (i < bodyEnd) {

@@ -1,5 +1,6 @@
 package com.papr.scanner.pdf.security
 
+import com.papr.scanner.pdf.Latin1Text
 import java.io.File
 import java.nio.charset.Charset
 import java.security.SecureRandom
@@ -26,8 +27,9 @@ class PdfEncryptor(
 
     /** [ownerPassword] defaults to [userPassword] when blank, per Algorithm 3. */
     fun encrypt(pdfFile: File, userPassword: String, ownerPassword: String = "") {
-        val original = pdfFile.readBytes()
-        val text = String(original, latin1)
+        // The file's one copy in memory: searched through a view, encrypted in place, written back.
+        val bytes = pdfFile.readBytes()
+        val text = Latin1Text(bytes)
 
         val trailer = requireNotNull(lastMatch(TRAILER_REGEX, text)) { "no trailer found" }.groupValues[1]
         val rootRef = requireNotNull(ROOT_REGEX.find(trailer)) { "no /Root in trailer" }.groupValues[1]
@@ -40,7 +42,7 @@ class PdfEncryptor(
         val userValue = securityHandler.computeUserValue(fileKey, documentId)
 
         val objects = objectScanner.scan(text)
-        val encrypted = objectEncryptor.encrypt(original, fileKey, objects)
+        objectEncryptor.encryptInPlace(bytes, fileKey, objects)
 
         val encryptObjNum = size
         val idHex = documentId.toPdfHex()
@@ -50,7 +52,7 @@ class PdfEncryptor(
             "\n/P $PERMISSIONS_ALLOW_ALL>>"
 
         val appendedObject = "$encryptObjNum 0 obj\n$encryptBody\nendobj\n".toByteArray(latin1)
-        val objectOffset = encrypted.size.toLong()
+        val objectOffset = bytes.size.toLong()
         val xrefOffset = objectOffset + appendedObject.size
 
         // Locale.ROOT: the default locale can format digits in another script (Arabic, for one).
@@ -59,12 +61,17 @@ class PdfEncryptor(
             "\n/Encrypt $encryptObjNum 0 R\n/ID [<$idHex> <$idHex>]\n/Prev $startxref>>" +
             "\nstartxref\n$xrefOffset\n%%EOF\n"
 
-        pdfFile.writeBytes(encrypted + appendedObject + xref.toByteArray(latin1) + newTrailer.toByteArray(latin1))
+        pdfFile.outputStream().use { out ->
+            out.write(bytes)
+            out.write(appendedObject)
+            out.write(xref.toByteArray(latin1))
+            out.write(newTrailer.toByteArray(latin1))
+        }
     }
 
     private fun ByteArray.toPdfHex(): String = joinToString("") { String.format(Locale.ROOT, "%02X", it) }
 
-    private fun lastMatch(regex: Regex, text: String) = regex.findAll(text).lastOrNull()
+    private fun lastMatch(regex: Regex, text: CharSequence) = regex.findAll(text).lastOrNull()
 
     companion object {
         // "Allow everything a valid password grants" per ISO 32000-1 Table 22;

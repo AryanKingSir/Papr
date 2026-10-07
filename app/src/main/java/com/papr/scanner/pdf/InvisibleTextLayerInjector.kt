@@ -1,6 +1,7 @@
 package com.papr.scanner.pdf
 
 import java.io.File
+import java.io.FileOutputStream
 import java.nio.charset.Charset
 import java.util.Locale
 
@@ -38,8 +39,10 @@ class InvisibleTextLayerInjector {
         }
         if (encodableByPage.values.all { it.isEmpty() }) return
 
+        // Only searched, through a view of the bytes, and the new objects are appended: a large
+        // export never needs a second copy of itself in memory.
         val original = pdfFile.readBytes()
-        val text = String(original, latin1)
+        val text = Latin1Text(original)
 
         val trailer = requireNotNull(lastMatch(TRAILER_REGEX, text)) { "no trailer found" }.groupValues[1]
         val rootRef = requireNotNull(ROOT_REGEX.find(trailer)) { "no /Root in trailer" }.groupValues[1]
@@ -84,7 +87,11 @@ class InvisibleTextLayerInjector {
         val xref = buildXref(newObjectOffsets)
         val newTrailer = "trailer\n<</Size $newSize\n/Root $rootRef\n/Prev $startxref>>\nstartxref\n$xrefOffset\n%%EOF\n"
 
-        pdfFile.writeBytes(original + appended.toString().toByteArray(latin1) + xref.toByteArray(latin1) + newTrailer.toByteArray(latin1))
+        FileOutputStream(pdfFile, true).use { out ->
+            out.write(appended.toString().toByteArray(latin1))
+            out.write(xref.toByteArray(latin1))
+            out.write(newTrailer.toByteArray(latin1))
+        }
     }
 
     /**
@@ -92,7 +99,7 @@ class InvisibleTextLayerInjector {
      * nodes of at most 8 pages, so beyond that the root's /Kids are intermediate
      * /Pages nodes rather than pages - walk the tree instead of reading one /Kids.
      */
-    private fun findPageObjectNumbers(text: String, rootRef: String): List<Int> {
+    private fun findPageObjectNumbers(text: CharSequence, rootRef: String): List<Int> {
         val catalog = findObjectBody(text, objectNumber(rootRef)) ?: return emptyList()
         val pagesRef = PAGES_REF_REGEX.find(catalog) ?: return emptyList()
         val pages = mutableListOf<Int>()
@@ -111,14 +118,14 @@ class InvisibleTextLayerInjector {
 
     private fun objectNumber(ref: String): Int = ref.trim().substringBefore(' ').toInt()
 
-    private fun findObjectBody(text: String, objNum: Int): String? {
+    private fun findObjectBody(text: CharSequence, objNum: Int): String? {
         val header = "\n$objNum 0 obj\n"
         val start = text.indexOf(header)
         if (start == -1) return null
         val bodyStart = start + header.length
         val end = text.indexOf("\nendobj", bodyStart)
         if (end == -1) return null
-        return text.substring(bodyStart, end)
+        return text.subSequence(bodyStart, end).toString()
     }
 
     private fun rewritePageBody(body: String, fontObjNum: Int, saveStateObjNum: Int, contentObjNum: Int): String {
@@ -163,7 +170,7 @@ class InvisibleTextLayerInjector {
         return builder.toString()
     }
 
-    private fun lastMatch(regex: Regex, text: String) = regex.findAll(text).lastOrNull()
+    private fun lastMatch(regex: Regex, text: CharSequence) = regex.findAll(text).lastOrNull()
 
     companion object {
         private val TRAILER_REGEX = Regex("trailer\\s*<<(.*?)>>", RegexOption.DOT_MATCHES_ALL)

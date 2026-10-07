@@ -489,6 +489,10 @@ class DocumentDetailViewModel(
             } catch (e: Exception) {
                 Log.e("Papr", "Export failed", e)
                 _errors.emit("Export failed. Please try again.")
+            } catch (e: OutOfMemoryError) {
+                // An Error, not an Exception: uncaught, it would close the app.
+                Log.e("Papr", "Export ran out of memory", e)
+                _errors.emit(OUT_OF_MEMORY_MESSAGE)
             } finally {
                 localState.update { it.copy(isExporting = false) }
             }
@@ -523,6 +527,9 @@ class DocumentDetailViewModel(
             } catch (e: Exception) {
                 Log.e("Papr", "Image export failed", e)
                 _errors.emit("Export failed. Please try again.")
+            } catch (e: OutOfMemoryError) {
+                Log.e("Papr", "Image export ran out of memory", e)
+                _errors.emit(OUT_OF_MEMORY_MESSAGE)
             } finally {
                 localState.update { it.copy(isExporting = false) }
             }
@@ -623,6 +630,8 @@ class DocumentDetailViewModel(
     private companion object {
         const val BYTES_PER_MB = 1024 * 1024
         const val MARKS_NEED_PRO = "Adding confidential marks needs Papr Pro."
+        const val OUT_OF_MEMORY_MESSAGE =
+            "This document is too big to export like this on this phone. Try again with Compress turned on."
     }
 }
 
