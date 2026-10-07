@@ -5,7 +5,6 @@ package com.papr.scanner.data.local.datastore
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import com.papr.scanner.domain.model.OnboardingState
@@ -54,6 +53,19 @@ class OnboardingRepositoryTest {
     }
 
     @Test
+    fun `resetting the tour brings the tips back but keeps the welcome marked as seen`() = runTest {
+        // The replay is opened from Settings directly. Clearing the welcome too would leave it
+        // cleared if the replay is left with Back, and the slides would then open every launch.
+        val repository = newRepository()
+        repository.markWelcomeSeen()
+        Tip.entries.forEach { repository.markTipSeen(it) }
+
+        repository.resetTour()
+
+        assertEquals(OnboardingState(welcomeSeen = true, seenTips = emptySet()), repository.state.first())
+    }
+
+    @Test
     fun `resetting the tour clears only the tour`() = runTest {
         val repository = newRepository()
         val settings = UserPreferencesRepository(dataStore)
@@ -65,11 +77,10 @@ class OnboardingRepositoryTest {
 
         repository.resetTour()
 
-        assertEquals(OnboardingState(welcomeSeen = false, seenTips = emptySet()), repository.state.first())
+        assertEquals(emptySet<Tip>(), repository.state.first().seenTips)
         assertEquals(ThemeMode.DARK, settings.settings.first().themeMode)
         assertEquals(true, settings.isProUnlocked.first())
         val prefs = dataStore.data.first()
         assertEquals(2, prefs[intPreferencesKey("usage_merge")])
-        assertEquals(null, prefs[booleanPreferencesKey("welcome_seen")])
     }
 }

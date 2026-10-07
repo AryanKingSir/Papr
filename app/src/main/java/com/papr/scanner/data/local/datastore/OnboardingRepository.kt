@@ -23,9 +23,12 @@ class OnboardingRepository(private val dataStore: DataStore<Preferences>) {
 
     suspend fun markTipSeen(tip: Tip) = dataStore.edit { it[tipKey(tip)] = true }
 
-    /** "Show tour again": everything the tour remembers is forgotten, and nothing else is touched. */
+    /**
+     * "Show tour again": every tip comes back, and nothing else is touched. The welcome stays seen:
+     * Settings opens the slides itself, and clearing it would leave it cleared if they're left
+     * with Back, so they'd open on every launch.
+     */
     suspend fun resetTour() = dataStore.edit { prefs ->
-        prefs.remove(WELCOME_SEEN)
         Tip.entries.forEach { prefs.remove(tipKey(it)) }
     }
 
