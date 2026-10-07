@@ -1,6 +1,7 @@
 package com.papr.scanner.presentation.common
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.IntRect
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -38,5 +39,21 @@ class SignatureCropTest {
         val result = signatureCropRect(strokes, padding = 10f, canvasWidth = 100, canvasHeight = 100)
 
         assertEquals(IntRect(0, 0, 100, 100), result)
+    }
+
+    @Test
+    fun `a signature drawn on a wider pad shrinks to fit a narrower one, keeping its shape`() {
+        val strokes = listOf(listOf(Offset(900f, 100f), Offset(1100f, 200f)))
+
+        val fitted = strokesFittedToPad(strokes, from = IntSize(1200, 400), to = IntSize(600, 400))
+
+        assertEquals(listOf(listOf(Offset(450f, 50f), Offset(550f, 100f))), fitted)
+    }
+
+    @Test
+    fun `a signature on a pad that got wider stays as drawn`() {
+        val strokes = listOf(listOf(Offset(10f, 20f), Offset(30f, 40f)))
+
+        assertEquals(strokes, strokesFittedToPad(strokes, from = IntSize(600, 400), to = IntSize(1200, 400)))
     }
 }

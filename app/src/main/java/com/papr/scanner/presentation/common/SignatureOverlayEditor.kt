@@ -50,7 +50,8 @@ fun SignatureOverlayEditor(
 ) {
     var strokes by rememberSaveable(stateSaver = StrokesSaver) { mutableStateOf(listOf<List<Offset>>()) }
     var currentStroke by remember { mutableStateOf(listOf<Offset>()) }
-    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
+    // Saved with the strokes, which are in its pixels: a rotation changes the pad's width.
+    var canvasSize by rememberSaveable(stateSaver = IntSizeSaver) { mutableStateOf(IntSize.Zero) }
     // On by default: drawing the same signature again on every page is the chore this saves.
     var rememberSignature by rememberSaveable { mutableStateOf(showRememberOption) }
 
@@ -75,7 +76,12 @@ fun SignatureOverlayEditor(
                         .height(180.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(Color.White)
-                        .onSizeChanged { canvasSize = it }
+                        .onSizeChanged { size ->
+                            if (canvasSize != IntSize.Zero && size != canvasSize) {
+                                strokes = strokesFittedToPad(strokes, from = canvasSize, to = size)
+                            }
+                            canvasSize = size
+                        }
                         .pointerInput(Unit) {
                             detectStrokes(
                                 drawDots = true,
@@ -170,4 +176,9 @@ private const val STROKE_WIDTH_PX = 6f
 private val StrokesSaver = Saver<List<List<Offset>>, ArrayList<FloatArray>>(
     save = { strokes -> ArrayList(strokes.map { stroke -> stroke.flatMap { listOf(it.x, it.y) }.toFloatArray() }) },
     restore = { saved -> saved.map { flat -> flat.toList().chunked(2) { (x, y) -> Offset(x, y) } } },
+)
+
+private val IntSizeSaver = Saver<IntSize, IntArray>(
+    save = { intArrayOf(it.width, it.height) },
+    restore = { IntSize(it[0], it[1]) },
 )
