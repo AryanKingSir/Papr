@@ -2,11 +2,12 @@ package com.papr.scanner.presentation.detail.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemGestures
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,6 +17,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import com.papr.scanner.domain.model.ConfidentialMarkStroke
 import com.papr.scanner.domain.model.InkStroke
@@ -65,6 +68,16 @@ fun PagePager(
         snapshotFlow { pagerState.currentPage }.collect { currentOnPageChanged(it) }
     }
 
+    // Wide enough to keep the page out of the screen-edge zones where gesture navigation's Back
+    // swipe starts: a stroke or signature drag beginning there would close the tool instead.
+    // Android honours gesture exclusion for only 200dp of each edge, so excluding the page
+    // isn't enough on a tall screen.
+    val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
+    val gestureInsets = WindowInsets.systemGestures
+    val startPadding = with(density) { maxOf(16.dp, gestureInsets.getLeft(this, layoutDirection).toDp()) }
+    val endPadding = with(density) { maxOf(16.dp, gestureInsets.getRight(this, layoutDirection).toDp()) }
+
     HorizontalPager(
         state = pagerState,
         // Drawing or dragging a signature must never turn into a page swipe.
@@ -79,10 +92,7 @@ fun PagePager(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp)
-                    // With gesture navigation, a stroke starting near the screen edge would be
-                    // taken as Back and close Markup; while drawing, the page is off limits to it.
-                    .then(if (markupTool != null || isPlacingSignature) Modifier.systemGestureExclusion() else Modifier)
+                    .padding(start = startPadding, top = 16.dp, end = endPadding, bottom = 16.dp)
                     .background(MaterialTheme.colorScheme.surfaceVariant),
             ) {
                 PageImage(

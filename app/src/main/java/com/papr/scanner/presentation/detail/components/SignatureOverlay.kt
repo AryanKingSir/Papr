@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.OpenInFull
@@ -106,7 +107,9 @@ fun SignatureOverlay(
             modifier = Modifier
                 .offset { IntOffset(left.roundToInt(), top.roundToInt()) }
                 .size(with(LocalDensity.current) { width.toDp() }, with(LocalDensity.current) { height.toDp() })
-                .then(if (isPlacing) Modifier.border(2.dp, MaterialTheme.colorScheme.primary) else Modifier)
+                // Only the signature and its two handles, while placing: small enough to stay
+                // within Android's 200dp-per-edge limit wherever on the page they are.
+                .then(if (isPlacing) Modifier.border(2.dp, MaterialTheme.colorScheme.primary).systemGestureExclusion() else Modifier)
                 .then(gestures),
         ) {
             PageImage(
@@ -125,6 +128,7 @@ fun SignatureOverlay(
                 modifier = Modifier
                     .offset { IntOffset((left + width - touchRadiusPx).roundToInt(), (top - touchRadiusPx).roundToInt()) }
                     .size(TOUCH_SIZE)
+                    .systemGestureExclusion()
                     .clickable(onClick = onRemove),
             ) {
                 Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface, shadowElevation = 2.dp, modifier = Modifier.size(CONTROL_SIZE)) {
@@ -141,6 +145,7 @@ fun SignatureOverlay(
                         IntOffset((left + width - touchRadiusPx).roundToInt(), (top + height - touchRadiusPx).roundToInt())
                     }
                     .size(TOUCH_SIZE)
+                    .systemGestureExclusion()
                     .pointerInput(bounds, pageAspect, signature) {
                         detectDragGestures(
                             onDrag = { change, drag ->
