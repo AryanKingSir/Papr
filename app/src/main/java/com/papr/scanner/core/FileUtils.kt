@@ -36,8 +36,11 @@ object FileUtils {
         File(context.filesDir, "documents/$documentId").apply { mkdirs() }
 
     /** Whether [path], once `..` and links are resolved, lies inside [dir]. */
-    fun isInside(path: String, dir: File): Boolean =
-        File(path).canonicalFile.toPath().startsWith(dir.canonicalFile.toPath())
+    // Compared as strings, not java.nio Paths, which need Android 8.
+    fun isInside(path: String, dir: File): Boolean {
+        val dirPath = dir.canonicalPath
+        return File(path).canonicalPath.startsWith(dirPath + File.separator)
+    }
 
     /** Holds each running export's working copies; nothing in it outlives the process that made it. */
     fun exportSnapshotRoot(context: Context): File = File(context.cacheDir, "export-snapshot")
