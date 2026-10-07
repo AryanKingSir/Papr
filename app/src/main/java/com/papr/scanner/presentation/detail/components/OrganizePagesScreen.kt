@@ -200,10 +200,12 @@ fun OrganizePagesScreen(
                                     onDragStarted = {
                                         isDragging = true
                                         haptics.perform(Haptic.DRAG_START)
-                                        dragTip.dismiss()
                                     },
                                     onDragStopped = {
                                         isDragging = false
+                                        // Not when the drag starts: the tip folding away then would
+                                        // shift the grid, leaving the held page behind the finger.
+                                        dragTip.dismiss()
                                         val orderedIds = order.map { it.id }
                                         // Only a page that actually moved gets the "done" feel.
                                         if (orderedIds != currentPages.map { it.id }) haptics.perform(Haptic.CONFIRM)
