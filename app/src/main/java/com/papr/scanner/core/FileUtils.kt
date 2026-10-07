@@ -35,6 +35,10 @@ object FileUtils {
     fun documentDir(context: Context, documentId: Long): File =
         File(context.filesDir, "documents/$documentId").apply { mkdirs() }
 
+    /** Whether [path], once `..` and links are resolved, lies inside [dir]. */
+    fun isInside(path: String, dir: File): Boolean =
+        File(path).canonicalFile.toPath().startsWith(dir.canonicalFile.toPath())
+
     /** Holds each running export's working copies; nothing in it outlives the process that made it. */
     fun exportSnapshotRoot(context: Context): File = File(context.cacheDir, "export-snapshot")
 

@@ -65,6 +65,8 @@ class ScanImporter(
             } catch (e: Exception) {
                 Log.e("Papr", "Failed to import scanned pages", e)
                 _events.send(ScanImportEvent.Failed)
+            } finally {
+                withContext(NonCancellable) { documentScannerManager.deleteScannerCopies(pageUris) }
             }
         }
     }

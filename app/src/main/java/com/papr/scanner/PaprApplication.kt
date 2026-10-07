@@ -22,6 +22,7 @@ class PaprApplication : Application() {
         container.applicationScope.launch { container.billingManager.connect() }
         removeUnfinishedDocuments()
         removeAbandonedExportCopies()
+        container.applicationScope.launch { container.documentScannerManager.deleteStaleScannerCopies() }
     }
 
     /** An export cut short by the app being killed leaves its page copies behind; none can be running yet. */

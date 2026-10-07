@@ -33,6 +33,29 @@ class DocumentScannerManager(private val context: Context) {
     fun getStartScanIntent(activity: Activity, singlePage: Boolean = false): Task<IntentSender> =
         (if (singlePage) singlePageScanner else multiPageScanner).getStartScanIntent(activity)
 
+    /**
+     * Google's scanner library copies every page it returns into the app's cache and never deletes
+     * them, so each scan would leave a full-size copy of its pages behind. Deletes [pageUris]' copies
+     * once they're imported (or failed to be); anything else is left alone.
+     */
+    suspend fun deleteScannerCopies(pageUris: List<Uri>) = withContext(Dispatchers.IO) {
+        pageUris.mapNotNull { uri -> uri.path?.takeIf { uri.scheme == "file" } }
+            .filter { FileUtils.isInside(it, scannerCacheDir()) }
+            .forEach { File(it).delete() }
+    }
+
+    /**
+     * Removes copies from scans that were never imported (the app killed before the result
+     * arrived). Only old ones: a result Android redelivers after restoring the app still needs its own.
+     */
+    suspend fun deleteStaleScannerCopies(now: Long = System.currentTimeMillis()) = withContext(Dispatchers.IO) {
+        scannerCacheDir().listFiles()
+            ?.filter { now - it.lastModified() > STALE_COPY_AGE_MS }
+            ?.forEach { it.deleteRecursively() }
+    }
+
+    private fun scannerCacheDir() = File(context.cacheDir, "mlkit_docscan_ui_client")
+
     fun extractPageUris(resultIntent: Intent?): List<Uri> {
         val result = resultIntent?.let { GmsDocumentScanningResult.fromActivityResultIntent(it) }
         return result?.pages?.map { it.imageUri } ?: emptyList()
@@ -59,4 +82,8 @@ class DocumentScannerManager(private val context: Context) {
                 throw e
             }
         }
+
+    private companion object {
+        const val STALE_COPY_AGE_MS = 24L * 60 * 60 * 1000
+    }
 }

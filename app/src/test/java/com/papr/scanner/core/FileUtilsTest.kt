@@ -1,10 +1,34 @@
 package com.papr.scanner.core
 
+import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FileUtilsTest {
+
+    private val scannerCache = File("/data/user/0/com.papr.scanner/cache/mlkit_docscan_ui_client")
+
+    @Test
+    fun `a scanner page in the scanner's cache folder is its own copy`() {
+        assertTrue(FileUtils.isInside("/data/user/0/com.papr.scanner/cache/mlkit_docscan_ui_client/123.jpg", scannerCache))
+    }
+
+    @Test
+    fun `a path that only climbs back into the scanner's cache folder name still counts by where it leads`() {
+        assertFalse(FileUtils.isInside("/data/user/0/com.papr.scanner/cache/mlkit_docscan_ui_client/../../files/documents/1/page.jpg", scannerCache))
+    }
+
+    @Test
+    fun `a folder whose name merely starts with the cache folder's name is not inside it`() {
+        assertFalse(FileUtils.isInside("/data/user/0/com.papr.scanner/cache/mlkit_docscan_ui_client2/1.jpg", scannerCache))
+    }
+
+    @Test
+    fun `a page outside the scanner's cache folder is not its copy`() {
+        assertFalse(FileUtils.isInside("/data/user/0/com.papr.scanner/files/documents/1/page.jpg", scannerCache))
+    }
 
     @Test
     fun `keeps a plain title unchanged`() {
