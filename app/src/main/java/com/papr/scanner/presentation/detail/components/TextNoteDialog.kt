@@ -17,6 +17,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import com.papr.scanner.presentation.common.HapticsFollowSetting
 
 /**
  * Types a text note's words. [initialText] is empty for a new note; an existing
@@ -39,14 +40,16 @@ fun TextNoteDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (onDelete == null) "Add text" else "Edit text") },
         text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                placeholder = { Text("Type here") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focus),
-            )
+            HapticsFollowSetting {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    placeholder = { Text("Type here") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focus),
+                )
+            }
         },
         confirmButton = {
             TextButton(onClick = { onSave(text.text.trim()) }, enabled = text.text.isNotBlank()) {

@@ -2,9 +2,13 @@ package com.papr.scanner.presentation.common
 
 import android.os.SystemClock
 import android.view.View
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.core.view.HapticFeedbackConstantsCompat
 import androidx.core.view.ViewCompat
 
@@ -36,6 +40,8 @@ class PaprHaptics(private val view: View?, private val enabled: () -> Boolean) {
 
     private val tickThrottle = TickThrottle()
 
+    val isEnabled: Boolean get() = enabled()
+
     fun perform(haptic: Haptic) {
         val view = view ?: return
         if (!enabled()) return
@@ -62,6 +68,19 @@ internal class TickThrottle(private val minGapMillis: Long = 40) {
 
 /** Silent until MainActivity provides the real one, so previews and tests never vibrate. */
 val LocalPaprHaptics = staticCompositionLocalOf { PaprHaptics(view = null, enabled = { false }) }
+
+/**
+ * Re-applies the Haptics setting to Compose's own haptics inside a dialog or bottom sheet. Each of
+ * those is a separate window whose root provides the phone's unfiltered haptics again, so without
+ * this a long-press in one of their text fields would still vibrate with Haptics off.
+ */
+@Composable
+fun HapticsFollowSetting(content: @Composable () -> Unit) {
+    val papr = LocalPaprHaptics.current
+    val system = LocalHapticFeedback.current
+    val gated = remember(papr, system) { GatedHapticFeedback(system) { papr.isEnabled } }
+    CompositionLocalProvider(LocalHapticFeedback provides gated, content = content)
+}
 
 /** Compose's own haptics (a long-press, text selection handles), silenced when the Haptics setting is off. */
 class GatedHapticFeedback(private val delegate: HapticFeedback, private val enabled: () -> Boolean) : HapticFeedback {

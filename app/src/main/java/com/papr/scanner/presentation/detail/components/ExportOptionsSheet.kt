@@ -41,6 +41,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.papr.scanner.domain.model.ExportFormat
 import com.papr.scanner.pdf.security.StandardSecurityHandler
+import com.papr.scanner.presentation.common.HapticsFollowSetting
 import com.papr.scanner.presentation.common.LocalPaprHaptics
 import com.papr.scanner.presentation.detail.ExportSettings
 import com.papr.scanner.usage.Allowance
@@ -142,23 +143,25 @@ fun ExportOptionsSheet(
                     onLockedTap = { lockedTap(MeteredFeature.PASSWORD_EXPORT) },
                 )
                 if (passwordEnabled) {
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text("Password") },
-                        isError = !passwordSupported,
-                        supportingText = if (passwordSupported) {
-                            null
-                        } else {
-                            { Text("Use only letters, numbers and symbols from a standard keyboard, so every PDF reader can open it.") }
-                        },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp, bottom = 8.dp),
-                    )
+                    HapticsFollowSetting {
+                        OutlinedTextField(
+                            value = password,
+                            onValueChange = { password = it },
+                            label = { Text("Password") },
+                            isError = !passwordSupported,
+                            supportingText = if (passwordSupported) {
+                                null
+                            } else {
+                                { Text("Use only letters, numbers and symbols from a standard keyboard, so every PDF reader can open it.") }
+                            },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp, bottom = 8.dp),
+                        )
+                    }
                 }
             }
 
