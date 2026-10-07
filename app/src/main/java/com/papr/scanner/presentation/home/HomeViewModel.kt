@@ -72,6 +72,8 @@ class HomeViewModel(
         val pagesByDocument = pages.groupBy { it.documentId }
 
         val filtered = documents
+            // A scan still being saved has its row but no pages yet; opening it would show nothing.
+            .filter { it.id in pagesByDocument }
             .filter { folder == null || it.folder == folder }
             .filter { dateRange == null || it.createdAt in dateRange }
 

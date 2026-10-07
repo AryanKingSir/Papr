@@ -92,7 +92,9 @@ class ScanImporter(
             val pageIds = documentRepository.insertPages(pages)
             pageTextExtractor.extractInBackground(pages.zip(pageIds) { page, id -> page.copy(id = id) })
             val thumbnail = FileUtils.generateThumbnail(appContext, pages.first())
-            documentRepository.updateDocument(document.copy(id = documentId, thumbnailUri = thumbnail.absolutePath))
+            // Re-read: once its pages exist the document shows on Home, and could be renamed meanwhile.
+            val saved = documentRepository.getDocument(documentId) ?: document.copy(id = documentId)
+            documentRepository.updateDocument(saved.copy(thumbnailUri = thumbnail.absolutePath))
             return documentId
         } catch (e: Throwable) {
             // Never leave an empty, thumbnail-less document in the grid.

@@ -130,7 +130,7 @@ class MainActivity : ComponentActivity() {
 
                     LaunchedEffect(navigateToDocumentId) {
                         navigateToDocumentId?.let { id ->
-                            navController.navigate(Screen.DocumentDetail.createRoute(id))
+                            navController.navigate(Screen.DocumentDetail.createRoute(id)) { launchSingleTop = true }
                             navigateToDocumentId = null
                         }
                     }
