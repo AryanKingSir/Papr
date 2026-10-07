@@ -36,7 +36,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,7 +79,7 @@ fun MergeConfirmScreen(
     val uiState by viewModel.uiState.collectAsState()
     val mergeAllowance by viewModel.mergeAllowance.collectAsState()
     // Non-null while the Pro sheet is open: why it opened.
-    var paywallReason by remember { mutableStateOf<String?>(null) }
+    var paywallReason by rememberSaveable { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val haptics = LocalPaprHaptics.current
 
