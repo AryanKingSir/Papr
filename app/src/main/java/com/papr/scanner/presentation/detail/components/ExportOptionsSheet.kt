@@ -36,6 +36,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -132,6 +135,11 @@ fun ExportOptionsSheet(
                         value = targetSizeMb,
                         onValueChange = { targetSizeMb = it },
                         valueRange = 0.2f..10f,
+                        // TalkBack would otherwise read the position as a percentage.
+                        modifier = Modifier.semantics {
+                            contentDescription = "Target size"
+                            stateDescription = "${"%.1f".format(targetSizeMb)} MB"
+                        },
                     )
                 }
                 OptionRow(
