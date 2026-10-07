@@ -22,7 +22,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.NoteAdd
+import androidx.compose.material.icons.automirrored.outlined.Redo
 import androidx.compose.material.icons.automirrored.outlined.RotateRight
+import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.BorderColor
 import androidx.compose.material.icons.outlined.Brush
@@ -293,6 +295,22 @@ fun DocumentDetailScreen(
                             onClick = saveTitle,
                             enabled = titleDraft.text.isNotBlank(),
                         ) { Text("Save") }
+                    } else if (uiState.mode == EditorMode.MARKUP) {
+                        // Up here rather than beside the colours and sizes, which need the whole row.
+                        IconButton(
+                            onClick = {
+                                haptics.perform(Haptic.SEGMENT_TICK)
+                                viewModel.undoMarkup()
+                            },
+                            enabled = uiState.canUndo,
+                        ) { Icon(Icons.AutoMirrored.Outlined.Undo, contentDescription = "Undo") }
+                        IconButton(
+                            onClick = {
+                                haptics.perform(Haptic.SEGMENT_TICK)
+                                viewModel.redoMarkup()
+                            },
+                            enabled = uiState.canRedo,
+                        ) { Icon(Icons.AutoMirrored.Outlined.Redo, contentDescription = "Redo") }
                     }
                 },
             )
@@ -378,17 +396,7 @@ fun DocumentDetailScreen(
                         }
                         else -> null
                     },
-                    canUndo = uiState.canUndo,
-                    canRedo = uiState.canRedo,
                     onStyleChange = { style -> viewModel.setToolStyle(uiState.markupTool, style) },
-                    onUndo = {
-                        haptics.perform(Haptic.SEGMENT_TICK)
-                        viewModel.undoMarkup()
-                    },
-                    onRedo = {
-                        haptics.perform(Haptic.SEGMENT_TICK)
-                        viewModel.redoMarkup()
-                    },
                 )
             } else {
                 TipCard(

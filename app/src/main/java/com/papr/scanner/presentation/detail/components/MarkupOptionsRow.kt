@@ -5,23 +5,16 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Redo
-import androidx.compose.material.icons.automirrored.outlined.Undo
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
@@ -48,24 +41,22 @@ import com.papr.scanner.presentation.detail.markup.sizeName
 /**
  * The selected markup tool's options above the tools: its colours and sizes
  * (each size drawn in the chosen ink, so you see the line you'll get), or a
- * hint for tools without options. Undo and redo sit at the end either way.
+ * hint for tools without options. Undo and redo are in the top bar, which leaves
+ * room for every choice at full touch size (48dp) even on a 360dp-wide phone.
  */
 @Composable
 fun MarkupOptionsRow(
     tool: MarkupTool,
     style: ToolStyle?,
     hint: String?,
-    canUndo: Boolean,
-    canRedo: Boolean,
     onStyleChange: (ToolStyle) -> Unit,
-    onUndo: () -> Unit,
-    onRedo: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = 12.dp, end = 4.dp),
+            .heightIn(min = 48.dp)
+            .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (style != null) {
@@ -74,7 +65,6 @@ fun MarkupOptionsRow(
                     .weight(1f)
                     .horizontalScroll(rememberScrollState()),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 tool.colors().forEach { ink ->
                     ColorSwatch(
@@ -105,15 +95,8 @@ fun MarkupOptionsRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .weight(1f)
-                    .padding(vertical = 8.dp),
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
             )
-        }
-        Spacer(modifier = Modifier.width(4.dp))
-        IconButton(onClick = onUndo, enabled = canUndo) {
-            Icon(Icons.AutoMirrored.Outlined.Undo, contentDescription = "Undo")
-        }
-        IconButton(onClick = onRedo, enabled = canRedo) {
-            Icon(Icons.AutoMirrored.Outlined.Redo, contentDescription = "Redo")
         }
     }
 }
@@ -123,7 +106,7 @@ private fun ColorSwatch(color: Color, name: String, selected: Boolean, onClick: 
     // A ring around the chosen colour rather than a check mark, so the ink itself stays visible.
     Box(
         modifier = Modifier
-            .size(36.dp)
+            .size(TOUCH_TARGET)
             .clip(CircleShape)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .semantics { contentDescription = name },
@@ -148,13 +131,18 @@ private fun ColorSwatch(color: Color, name: String, selected: Boolean, onClick: 
 private fun SizeChoice(tool: MarkupTool, option: MarkupSize, color: Color, selected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(width = 40.dp, height = 36.dp)
+            .size(TOUCH_TARGET)
             .clip(RoundedCornerShape(10.dp))
-            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .semantics { contentDescription = tool.sizeName(option) },
         contentAlignment = Alignment.Center,
     ) {
+        Box(
+            modifier = Modifier
+                .size(width = 40.dp, height = 36.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent),
+        )
         // A scrap of white paper, so each sample shows the ink as it'll look on the page - in either theme.
         Box(
             modifier = Modifier
@@ -200,3 +188,6 @@ private fun SizeChoice(tool: MarkupTool, option: MarkupSize, color: Color, selec
 }
 
 private const val HIGHLIGHTER_PREVIEW_ALPHA = 0.6f
+
+/** Android's minimum touch size; the swatch and sample drawn inside stay their old size. */
+private val TOUCH_TARGET = 48.dp
