@@ -69,7 +69,8 @@ fun DocumentGridItem(
         ) {
             PageImage(
                 file = document.thumbnailUri.takeIf { it.isNotBlank() }?.let { File(it) },
-                contentDescription = document.title,
+                // The title is right next to it; naming the picture too made TalkBack read it twice.
+                contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )

@@ -240,7 +240,8 @@ private fun MergeDocumentRow(
     ) {
         PageImage(
             file = document.thumbnailUri.takeIf { it.isNotBlank() }?.let { File(it) },
-            contentDescription = document.title,
+            // The title is right next to it; naming the picture too made TalkBack read it twice.
+            contentDescription = null,
             modifier = Modifier
                 .size(56.dp)
                 .clip(RoundedCornerShape(8.dp)),
