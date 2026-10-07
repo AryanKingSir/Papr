@@ -89,6 +89,7 @@ fun SettingsScreen(onBack: () -> Unit, onShowTour: () -> Unit) {
             container.savedSignatureStore,
             container.billingManager,
             container.usageTracker.isPro,
+            container.appSettings.value,
         )
     }
     val settings by viewModel.settings.collectAsState()
@@ -231,22 +232,25 @@ fun SettingsScreen(onBack: () -> Unit, onShowTour: () -> Unit) {
 
             SectionDivider()
             SectionHeading("Papr Pro")
-            ListItem(
-                headlineContent = { Text(if (isPro) "You own Papr Pro" else "Free plan") },
-                supportingContent = {
-                    Text(
-                        if (isPro) {
-                            "Every feature, with no monthly limits."
-                        } else {
-                            "$FREE_MONTHLY_LIMIT a month each of searchable-text, password and compressed exports and merges."
-                        }
-                    )
-                },
-                trailingContent = if (isPro) null else {
-                    { Button(onClick = { showProSheet = true }) { Text("Upgrade") } }
-                },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            )
+            // Shown once known: a Pro owner shouldn't see "Free plan" for a frame first.
+            isPro?.let { isPro ->
+                ListItem(
+                    headlineContent = { Text(if (isPro) "You own Papr Pro" else "Free plan") },
+                    supportingContent = {
+                        Text(
+                            if (isPro) {
+                                "Every feature, with no monthly limits."
+                            } else {
+                                "$FREE_MONTHLY_LIMIT a month each of searchable-text, password and compressed exports and merges."
+                            }
+                        )
+                    },
+                    trailingContent = if (isPro) null else {
+                        { Button(onClick = { showProSheet = true }) { Text("Upgrade") } }
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                )
+            }
             OutlinedButton(
                 onClick = viewModel::restorePurchase,
                 enabled = !isRestoring,

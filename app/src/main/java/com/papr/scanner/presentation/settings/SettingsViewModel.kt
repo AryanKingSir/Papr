@@ -32,14 +32,17 @@ class SettingsViewModel(
     private val savedSignatureStore: SavedSignatureStore,
     private val billingManager: BillingManager,
     isProFlow: Flow<Boolean>,
+    // The app already holds the stored settings, so the first frame shows them rather than the defaults.
+    initialSettings: AppSettings?,
 ) : ViewModel() {
 
     val settings: StateFlow<AppSettings> =
-        preferences.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSettings())
+        preferences.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initialSettings ?: AppSettings())
 
     val savedSignature: StateFlow<SavedSignature?> = savedSignatureStore.state
 
-    val isPro: StateFlow<Boolean> = isProFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    /** Null until it's known, so a Pro owner never sees "Free plan" flash up first. */
+    val isPro: StateFlow<Boolean?> = isProFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val _isRestoring = MutableStateFlow(false)
     val isRestoring: StateFlow<Boolean> = _isRestoring.asStateFlow()
@@ -90,7 +93,7 @@ class SettingsViewModel(
         if (_isRestoring.value) return
         viewModelScope.launch {
             _isRestoring.value = true
-            val wasPro = isPro.value
+            val wasPro = preferences.isProUnlocked.first()
             try {
                 val message = when (billingManager.connect()) {
                     ConnectResult.UNAVAILABLE -> "Couldn't reach Google Play. Try again."
