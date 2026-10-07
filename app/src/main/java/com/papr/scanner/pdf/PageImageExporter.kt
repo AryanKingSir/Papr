@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import com.papr.scanner.core.FileUtils
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 /** Exports pages as JPG images, with their markup, signature and confidential marks drawn into the pixels. */
@@ -21,6 +22,7 @@ class PageImageExporter(private val overlayRenderer: PageOverlayRenderer) {
             outputDir.deleteRecursively()
             outputDir.mkdirs()
             pages.mapIndexed { index, (pageFile, overlays) ->
+                ensureActive()
                 val bitmap = FileUtils.decodeDownsampled(pageFile, MAX_IMAGE_DIMENSION, mutable = true)
                 try {
                     overlayRenderer.draw(Canvas(bitmap), overlays, bitmap.width, bitmap.height)

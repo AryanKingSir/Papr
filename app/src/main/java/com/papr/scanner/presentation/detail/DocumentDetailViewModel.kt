@@ -423,6 +423,7 @@ class DocumentDetailViewModel(
         val features = meteredFeaturesFor(settings)
         viewModelScope.launch {
             localState.update { it.copy(isExporting = true) }
+            val snapshotDir = newExportSnapshotDir()
             try {
                 // The sheet locks used-up options, but it may have been opened before the last use.
                 usageTracker.firstUsedUp(features)?.let { usedUp ->
@@ -433,32 +434,31 @@ class DocumentDetailViewModel(
                     val document = documentRepository.getDocument(documentId) ?: return@launch
                     val pages = documentRepository.getPages(documentId)
                     if (pages.isEmpty()) return@launch
-                    document.title to snapshotPages(pages)
+                    document.title to snapshotPages(pages, snapshotDir)
                 }
                 val exportFile = File(FileUtils.documentDir(appContext, documentId), "${FileUtils.sanitizeFileName(title)}.pdf")
-                val compiled = try {
-                    pdfEngine.generatePdf(
-                        pages.map { it.first },
-                        exportFile,
-                        PdfGenerationOptions(
-                            ocrEnabled = settings.ocrEnabled,
-                            // Keyed by position in the export, which is what PdfEngine's page index means.
-                            overlaysByPageIndex = pages.mapIndexedNotNull { index, (_, overlays) ->
-                                overlays.takeUnless { it.isEmpty }?.let { index to it }
-                            }.toMap(),
-                            passwordProtection = settings.password
-                                .takeIf { settings.passwordEnabled && it.isNotBlank() }
-                                ?.let { PasswordProtection(userPassword = it) },
-                            targetSizeBytes = if (settings.compressToTargetSize) {
-                                (settings.targetSizeMb * BYTES_PER_MB).toLong()
-                            } else {
-                                null
-                            },
-                        ),
-                    )
-                } finally {
-                    exportSnapshotDir().deleteRecursively()
-                }
+                // Built beside the snapshot and moved into place only once finished, so an export
+                // that was abandoned (the screen closed) can never overwrite a newer one's file.
+                val compiled = pdfEngine.generatePdf(
+                    pages.map { it.first },
+                    File(snapshotDir, "export.pdf"),
+                    PdfGenerationOptions(
+                        ocrEnabled = settings.ocrEnabled,
+                        // Keyed by position in the export, which is what PdfEngine's page index means.
+                        overlaysByPageIndex = pages.mapIndexedNotNull { index, (_, overlays) ->
+                            overlays.takeUnless { it.isEmpty }?.let { index to it }
+                        }.toMap(),
+                        passwordProtection = settings.password
+                            .takeIf { settings.passwordEnabled && it.isNotBlank() }
+                            ?.let { PasswordProtection(userPassword = it) },
+                        targetSizeBytes = if (settings.compressToTargetSize) {
+                            (settings.targetSizeMb * BYTES_PER_MB).toLong()
+                        } else {
+                            null
+                        },
+                    ),
+                )
+                withContext(Dispatchers.IO) { moveInto(compiled.file, exportFile) }
                 fileMutex.withLock {
                     // Read again: the title may have changed while the export ran.
                     val document = documentRepository.getDocument(documentId) ?: return@launch
@@ -474,10 +474,10 @@ class DocumentDetailViewModel(
                 if (!compiled.metTarget) {
                     _errors.emit(
                         "Couldn't get it under ${formatMb(settings.targetSizeMb)} MB. " +
-                            "The smallest it would go is ${formatSmallestMb(compiled.file.length() / BYTES_PER_MB.toFloat())} MB."
+                            "The smallest it would go is ${formatSmallestMb(exportFile.length() / BYTES_PER_MB.toFloat())} MB."
                     )
                 }
-                _pdfReady.send(compiled.file)
+                _pdfReady.send(exportFile)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: TextRecognitionUnavailableException) {
@@ -494,6 +494,7 @@ class DocumentDetailViewModel(
                 Log.e("Papr", "Export ran out of memory", e)
                 _errors.emit(OUT_OF_MEMORY_MESSAGE)
             } finally {
+                snapshotDir.deleteRecursively()
                 localState.update { it.copy(isExporting = false) }
             }
         }
@@ -503,24 +504,21 @@ class DocumentDetailViewModel(
     private fun exportImages() {
         viewModelScope.launch {
             localState.update { it.copy(isExporting = true) }
+            val snapshotDir = newExportSnapshotDir()
             try {
                 val (title, pages) = fileMutex.withLock {
                     val document = documentRepository.getDocument(documentId) ?: return@launch
                     val pages = documentRepository.getPages(documentId)
                     if (pages.isEmpty()) return@launch
-                    document.title to snapshotPages(pages)
+                    document.title to snapshotPages(pages, snapshotDir)
                 }
-                val images = try {
-                    pageImageExporter.export(
-                        pages,
-                        // Inside the document's folder: shareable through the FileProvider, and
-                        // deleted along with the document.
-                        File(FileUtils.documentDir(appContext, documentId), "images"),
-                        FileUtils.sanitizeFileName(title),
-                    )
-                } finally {
-                    exportSnapshotDir().deleteRecursively()
-                }
+                val images = pageImageExporter.export(
+                    pages,
+                    // Inside the document's folder: shareable through the FileProvider, and
+                    // deleted along with the document.
+                    File(FileUtils.documentDir(appContext, documentId), "images"),
+                    FileUtils.sanitizeFileName(title),
+                )
                 _imagesReady.send(images)
             } catch (e: CancellationException) {
                 throw e
@@ -531,6 +529,7 @@ class DocumentDetailViewModel(
                 Log.e("Papr", "Image export ran out of memory", e)
                 _errors.emit(OUT_OF_MEMORY_MESSAGE)
             } finally {
+                snapshotDir.deleteRecursively()
                 localState.update { it.copy(isExporting = false) }
             }
         }
@@ -540,10 +539,10 @@ class DocumentDetailViewModel(
      * Copies of [pages]' images and signatures as they are now, with their overlays, for an export
      * to build from without holding fileMutex - so editing carries on during a long export, and an
      * edit made meanwhile (a rotation, say) can't pair a new image with old marks. Call under
-     * fileMutex; delete [exportSnapshotDir] when done.
+     * fileMutex; delete [dir] when done.
      */
-    private suspend fun snapshotPages(pages: List<Page>): List<Pair<File, PageOverlays>> = withContext(Dispatchers.IO) {
-        val dir = exportSnapshotDir().apply { deleteRecursively(); mkdirs() }
+    private suspend fun snapshotPages(pages: List<Page>, dir: File): List<Pair<File, PageOverlays>> = withContext(Dispatchers.IO) {
+        dir.mkdirs()
         pages.mapIndexed { index, page ->
             val image = File(page.imageUri).copyTo(File(dir, "page-$index.jpg"), overwrite = true)
             val signature = page.signature?.let { signature ->
@@ -555,8 +554,17 @@ class DocumentDetailViewModel(
         }
     }
 
-    // One export runs at a time (isExporting), so one folder is enough.
-    private fun exportSnapshotDir() = File(appContext.cacheDir, "export-snapshot")
+    // One per export: a screen closed mid-export can still be finishing its export while a new
+    // screen starts another, and neither may delete the other's copies.
+    private fun newExportSnapshotDir() = File(FileUtils.exportSnapshotRoot(appContext), UUID.randomUUID().toString())
+
+    /** Puts a finished export at [target], replacing an earlier one. */
+    private fun moveInto(source: File, target: File) {
+        if (!source.renameTo(target)) {
+            source.copyTo(target, overwrite = true)
+            source.delete()
+        }
+    }
 
     /**
      * Runs [edit] under [fileMutex], reporting any failure as [errorMessage] instead of crashing.

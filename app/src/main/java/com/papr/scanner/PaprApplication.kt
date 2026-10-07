@@ -1,7 +1,9 @@
 package com.papr.scanner
 
 import android.app.Application
+import com.papr.scanner.core.FileUtils
 import com.papr.scanner.di.AppContainer
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -14,6 +16,14 @@ class PaprApplication : Application() {
         container = AppContainer(this)
         container.pageTextExtractor.extractMissingInBackground()
         removeUnfinishedDocuments()
+        removeAbandonedExportCopies()
+    }
+
+    /** An export cut short by the app being killed leaves its page copies behind; none can be running yet. */
+    private fun removeAbandonedExportCopies() {
+        container.applicationScope.launch(Dispatchers.IO) {
+            FileUtils.exportSnapshotRoot(this@PaprApplication).deleteRecursively()
+        }
     }
 
     /**

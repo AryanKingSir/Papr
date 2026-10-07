@@ -12,6 +12,8 @@ import java.io.IOException
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 /** A built PDF, and whether it came in at or under the requested size (always true when none was asked for). */
@@ -79,6 +81,8 @@ class BitmapPdfCompiler {
             // document's pixel count that has to stay bounded, not just each page's.
             val maxPixelsPerPage = TOTAL_PIXEL_BUDGET / pageFiles.size.coerceAtLeast(1)
             pageFiles.forEachIndexed { index, pageFile ->
+                // An abandoned export (its screen closed) stops here rather than building every page.
+                currentCoroutineContext().ensureActive()
                 val bitmap = decodeScaled(pageFile, scale, maxPixelsPerPage)
                 try {
                     preparePage(Canvas(bitmap), bitmap, index)

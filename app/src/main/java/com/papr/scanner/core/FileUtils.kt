@@ -35,6 +35,9 @@ object FileUtils {
     fun documentDir(context: Context, documentId: Long): File =
         File(context.filesDir, "documents/$documentId").apply { mkdirs() }
 
+    /** Holds each running export's working copies; nothing in it outlives the process that made it. */
+    fun exportSnapshotRoot(context: Context): File = File(context.cacheDir, "export-snapshot")
+
     fun thumbnailFile(context: Context, documentId: Long): File =
         File(context.filesDir, "thumbnails").apply { mkdirs() }.let { File(it, "$documentId.jpg") }
 
