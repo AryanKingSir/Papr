@@ -214,9 +214,10 @@ class DocumentDetailViewModel(
                 FileUtils.rotateJpeg(file, 90f)
                 if (rotated != page) documentRepository.updatePage(rotated)
                 refreshThumbnailIfFirst(rotated)
+                // Per page, so a long batch shows each page turn as it's done rather than all at the end.
+                localState.update { it.copy(revision = it.revision + 1) }
             }
             touchDocument()
-            localState.update { it.copy(revision = it.revision + 1) }
         }
     }
 
