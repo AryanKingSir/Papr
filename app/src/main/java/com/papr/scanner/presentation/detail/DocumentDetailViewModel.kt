@@ -240,6 +240,7 @@ class DocumentDetailViewModel(
 
     fun deletePages(pageIds: Collection<Long>) {
         launchEdit("Couldn't delete the page") {
+            val before = documentRepository.getPages(documentId).map { it.id }
             for (pageId in pageIds) {
                 val page = documentRepository.getPage(pageId) ?: continue
                 documentRepository.deletePage(page)
@@ -260,6 +261,9 @@ class DocumentDetailViewModel(
             // (thumbnail source) would stop matching the page displayed first.
             val renumbered = pagesInNewOrder(remaining, remaining.map { it.id })
             if (renumbered.isNotEmpty()) documentRepository.updatePages(renumbered)
+            // The same page stays on screen; without this the index would now point at another.
+            val shown = indexShownAfterDeleting(before, localState.value.currentPageIndex, pageIds.toSet())
+            localState.update { it.copy(currentPageIndex = shown) }
             documentRepository.getDocument(documentId)?.let { document ->
                 documentRepository.updateDocument(
                     document.copy(pageCount = remaining.size, updatedAt = System.currentTimeMillis())
@@ -666,6 +670,18 @@ private fun Page.markupSnapshot() = MarkupSnapshot(annotations, confidentialMark
  * order, renumbered 0..n-1. Ids that aren't pages any more are skipped, and
  * pages missing from [orderedIds] (added meanwhile) keep their order at the end.
  */
+/**
+ * Which page to show once [deleted] are gone from [ids] (in order), when page [shownIndex] was on
+ * screen: the same page if it's still there, otherwise the one that took its place.
+ */
+internal fun indexShownAfterDeleting(ids: List<Long>, shownIndex: Int, deleted: Set<Long>): Int {
+    val remaining = ids.filterNot { it in deleted }
+    val shownId = ids.getOrNull(shownIndex)
+    val index = remaining.indexOf(shownId).takeIf { it != -1 }
+        ?: ids.take(shownIndex).count { it !in deleted }
+    return index.coerceIn(0, (remaining.size - 1).coerceAtLeast(0))
+}
+
 /** [ids] with the page at [index] moved [step] places (-1 earlier, 1 later), unchanged at either end. */
 internal fun idsWithPageMoved(ids: List<Long>, index: Int, step: Int): List<Long> {
     val target = index + step

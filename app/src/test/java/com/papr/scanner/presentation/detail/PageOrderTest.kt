@@ -52,4 +52,23 @@ class PageOrderTest {
         assertEquals(listOf(10L, 11L), idsWithPageMoved(listOf(10L, 11L), index = 1, step = 1))
         assertEquals(listOf(10L, 11L), idsWithPageMoved(listOf(10L, 11L), index = 0, step = -1))
     }
+
+    @Test
+    fun `deleting earlier pages keeps the shown page on screen`() {
+        // Showing page 6 (id 15) of 10; pages 1 and 2 deleted.
+        val ids = (10L..19L).toList()
+        assertEquals(3, indexShownAfterDeleting(ids, shownIndex = 5, deleted = setOf(10L, 11L)))
+    }
+
+    @Test
+    fun `deleting the shown page shows the page that took its place`() {
+        val ids = (10L..19L).toList()
+        assertEquals(4, indexShownAfterDeleting(ids, shownIndex = 5, deleted = setOf(15L, 11L)))
+    }
+
+    @Test
+    fun `deleting the shown last page shows the new last page`() {
+        val ids = listOf(10L, 11L, 12L)
+        assertEquals(1, indexShownAfterDeleting(ids, shownIndex = 2, deleted = setOf(12L)))
+    }
 }
