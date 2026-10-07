@@ -79,4 +79,4 @@ Welcome to Papr! Scan documents, make them searchable, sign and mark them up, an
 |---|---|---|
 | App icon | `icon-512.png` | 512 × 512 PNG, 32-bit |
 | Feature graphic | `feature-graphic.png` | 1024 × 500 PNG/JPG, no alpha |
-| Phone screenshots | `screenshots/01-home.png` … `06-dark.png` | 6 images, 1080 × 1920 (9:16; Play allows at most 2:1) |
+| Phone screenshots | `screenshots/01-home.png` … `07-welcome.png` | 7 images, 1080 × 1920 (9:16; Play allows at most 2:1). Retaken 2026-10-07 from the release build on the Android 17 emulator, demo-mode status bar |
