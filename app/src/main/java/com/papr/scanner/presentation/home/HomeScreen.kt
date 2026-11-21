@@ -24,15 +24,12 @@ import androidx.compose.material.icons.automirrored.outlined.MergeType
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DocumentScanner
-import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -70,7 +67,6 @@ import com.papr.scanner.presentation.home.components.EmptyState
 import com.papr.scanner.presentation.home.components.FilterButton
 import com.papr.scanner.presentation.home.components.FilterSheet
 import com.papr.scanner.presentation.home.components.NoMatchesState
-import com.papr.scanner.usage.MeteredFeature
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 
@@ -79,8 +75,6 @@ import kotlinx.coroutines.flow.drop
 fun HomeScreen(
     onDocumentClick: (Long) -> Unit,
     onScanClick: () -> Unit,
-    // The reason the sheet opened, or null when the Pro button opened it.
-    onUpgradeClick: (reason: String?) -> Unit,
     onMergeClick: (documentIds: List<Long>) -> Unit,
     onSettingsClick: () -> Unit,
 ) {
@@ -88,13 +82,9 @@ fun HomeScreen(
         HomeViewModel(
             container.documentRepository,
             container.documentDeleter,
-            container.usageTracker.isPro,
-            container.usageTracker.allowances,
         )
     }
     val uiState by viewModel.uiState.collectAsState()
-    val isPro by viewModel.isPro.collectAsState()
-    val mergesLeft by viewModel.mergesLeft.collectAsState()
     val haptics = LocalPaprHaptics.current
     val selectTip = rememberTip(Tip.HOME_SELECT)
     var pendingDeleteSelection by rememberSaveable { mutableStateOf(false) }
@@ -146,16 +136,6 @@ fun HomeScreen(
                         }
                     },
                     actions = {
-                        if (isPro == false) {
-                            FilledTonalButton(
-                                onClick = { onUpgradeClick(null) },
-                                contentPadding = PaddingValues(start = 12.dp, end = 16.dp),
-                                modifier = Modifier.padding(end = 8.dp),
-                            ) {
-                                Icon(Icons.Outlined.WorkspacePremium, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Text("Pro", modifier = Modifier.padding(start = 6.dp))
-                            }
-                        }
                         IconButton(onClick = onSettingsClick) {
                             Icon(Icons.Outlined.Settings, contentDescription = "Settings")
                         }
@@ -182,20 +162,13 @@ fun HomeScreen(
                                 // Says what it needs rather than sitting there disabled with no reason.
                                 if (selected.size < 2) "Merge (pick 2+)" else "Merge",
                                 {
-                                    if (mergesLeft == 0) {
-                                        // Straight to the Pro sheet; the selection stays so they can merge once upgraded.
-                                        haptics.perform(Haptic.REJECT)
-                                        onUpgradeClick(MeteredFeature.MERGE.limitReachedMessage)
-                                    } else {
-                                        onMergeClick(selected)
-                                        // Like Delete, acting on the selection ends it - otherwise Home is
-                                        // still mid-selection when you come back from the merged document.
-                                        viewModel.clearSelection()
-                                    }
+                                    onMergeClick(selected)
+                                    // Like Delete, acting on the selection ends it - otherwise Home is
+                                    // still mid-selection when you come back from the merged document.
+                                    viewModel.clearSelection()
                                 },
                                 weight,
                                 enabled = selected.size >= 2,
-                                locked = mergesLeft == 0,
                             )
                         }
                     }

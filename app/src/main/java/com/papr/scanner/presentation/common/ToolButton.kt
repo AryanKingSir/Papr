@@ -16,8 +16,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,14 +28,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /**
  * One labelled tool: an icon over its name, so nothing on the bar has to be
- * guessed. [selected] shows the active tool with a filled pill behind the icon;
- * [locked] adds a small lock for tools that need Pro.
+ * guessed. [selected] shows the active tool with a filled pill behind the icon.
  */
 @Composable
 fun ToolButton(
@@ -47,7 +43,6 @@ fun ToolButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     selected: Boolean = false,
-    locked: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     val contentColor = when {
@@ -63,7 +58,6 @@ fun ToolButton(
             .semantics {
                 // So TalkBack says which tool is the active one, not only how it looks.
                 this.selected = selected
-                if (locked) stateDescription = "Needs Papr Pro"
             }
             .padding(horizontal = 4.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -76,17 +70,6 @@ fun ToolButton(
             contentAlignment = Alignment.Center,
         ) {
             Icon(icon, contentDescription = null, tint = if (selected) colors.onSecondaryContainer else contentColor)
-            if (locked) {
-                Icon(
-                    Icons.Filled.Lock,
-                    contentDescription = null,
-                    tint = colors.primary,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 2.dp, end = 8.dp)
-                        .size(12.dp),
-                )
-            }
         }
         Text(
             text = label,

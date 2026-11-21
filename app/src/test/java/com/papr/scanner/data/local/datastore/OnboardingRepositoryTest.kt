@@ -5,8 +5,6 @@ package com.papr.scanner.data.local.datastore
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.intPreferencesKey
 import com.papr.scanner.domain.model.OnboardingState
 import com.papr.scanner.domain.model.ThemeMode
 import com.papr.scanner.domain.model.Tip
@@ -28,7 +26,7 @@ class OnboardingRepositoryTest {
 
     private lateinit var dataStore: DataStore<Preferences>
 
-    // DataStore on the test's own dispatcher, as in UsageTrackerTest.
+    // DataStore on the test's own dispatcher.
     private fun TestScope.newRepository(): OnboardingRepository {
         dataStore = PreferenceDataStoreFactory.create(
             scope = CoroutineScope(coroutineContext + Job()),
@@ -70,8 +68,7 @@ class OnboardingRepositoryTest {
         val repository = newRepository()
         val settings = UserPreferencesRepository(dataStore)
         settings.setThemeMode(ThemeMode.DARK)
-        settings.setProUnlocked(true)
-        dataStore.edit { it[intPreferencesKey("usage_merge")] = 2 }
+        settings.setHapticsEnabled(false)
         repository.markWelcomeSeen()
         Tip.entries.forEach { repository.markTipSeen(it) }
 
@@ -79,8 +76,6 @@ class OnboardingRepositoryTest {
 
         assertEquals(emptySet<Tip>(), repository.state.first().seenTips)
         assertEquals(ThemeMode.DARK, settings.settings.first().themeMode)
-        assertEquals(true, settings.isProUnlocked.first())
-        val prefs = dataStore.data.first()
-        assertEquals(2, prefs[intPreferencesKey("usage_merge")])
+        assertEquals(false, settings.settings.first().hapticsEnabled)
     }
 }

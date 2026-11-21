@@ -13,16 +13,6 @@ import kotlinx.coroutines.flow.map
 
 class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
 
-    val isProUnlocked: Flow<Boolean> = dataStore.data.map { prefs ->
-        prefs[IS_PRO_UNLOCKED] ?: false
-    }
-
-    suspend fun setProUnlocked(unlocked: Boolean) {
-        dataStore.edit { prefs ->
-            prefs[IS_PRO_UNLOCKED] = unlocked
-        }
-    }
-
     /** Anything not set yet - or stored by a newer version with a value this one doesn't know - reads as the default. */
     val settings: Flow<AppSettings> = dataStore.data.map { prefs ->
         val defaults = AppSettings()
@@ -49,7 +39,6 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
         enumValues<T>().firstOrNull { it.name == name }
 
     private companion object {
-        val IS_PRO_UNLOCKED = booleanPreferencesKey("is_pro_unlocked")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val DELETE_ORIGINALS_AFTER_MERGE = booleanPreferencesKey("delete_originals_after_merge")

@@ -28,7 +28,7 @@ enum class Haptic(internal val constant: Int) {
     /** Something finished: saved, exported, merged, deleted. */
     CONFIRM(HapticFeedbackConstantsCompat.CONFIRM),
 
-    /** Something didn't happen: an error, or a feature that needs Pro. */
+    /** Something didn't happen: an error. */
     REJECT(HapticFeedbackConstantsCompat.REJECT),
 }
 

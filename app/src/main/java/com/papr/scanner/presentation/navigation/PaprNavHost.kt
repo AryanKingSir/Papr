@@ -2,10 +2,6 @@ package com.papr.scanner.presentation.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavBackStackEntry
@@ -19,7 +15,6 @@ import com.papr.scanner.presentation.detail.DocumentDetailScreen
 import com.papr.scanner.presentation.home.HomeScreen
 import com.papr.scanner.presentation.merge.MergeConfirmScreen
 import com.papr.scanner.presentation.onboarding.WelcomeScreen
-import com.papr.scanner.presentation.paywall.ProUpgradeSheet
 import com.papr.scanner.presentation.settings.SettingsScreen
 import kotlinx.coroutines.launch
 
@@ -51,24 +46,12 @@ fun PaprNavHost(
             )
         }
         composable(Screen.Home.route) { entry ->
-            // The sheet's open state and the reason it opened (null when the Pro pill opened it) survive rotation.
-            var paywallOpen by rememberSaveable { mutableStateOf(false) }
-            var paywallReason by rememberSaveable { mutableStateOf<String?>(null) }
-
             HomeScreen(
                 onDocumentClick = { id -> navController.fromTop(entry) { navigate(Screen.DocumentDetail.createRoute(id)) } },
                 onScanClick = onScanClick,
-                onUpgradeClick = { reason ->
-                    paywallReason = reason
-                    paywallOpen = true
-                },
                 onMergeClick = { ids -> navController.fromTop(entry) { navigate(Screen.MergeConfirm.createRoute(ids)) } },
                 onSettingsClick = { navController.fromTop(entry) { navigate(Screen.Settings.route) } },
             )
-
-            if (paywallOpen) {
-                ProUpgradeSheet(onDismiss = { paywallOpen = false }, reason = paywallReason)
-            }
         }
         composable(Screen.Settings.route) { entry ->
             SettingsScreen(

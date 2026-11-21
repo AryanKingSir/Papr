@@ -43,8 +43,6 @@ fun ConfidentialMarkOverlay(
     marks: List<ConfidentialMarkStroke>,
     editingEnabled: Boolean,
     modifier: Modifier = Modifier,
-    // False when a new mark won't be saved (Pro only): it then isn't kept on screen meanwhile.
-    canAddMarks: Boolean = true,
     crop: Boolean = false,
     onStrokeAdded: (ConfidentialMarkStroke) -> Unit = {},
     onStrokeErased: (ConfidentialMarkStroke) -> Unit = {},
@@ -55,7 +53,6 @@ fun ConfidentialMarkOverlay(
     var savingMarks by remember { mutableStateOf(listOf<ConfidentialMarkStroke>()) }
     LaunchedEffect(marks) { savingMarks = emptyList() }
     val currentMarks by rememberUpdatedState(marks)
-    val currentCanAddMarks by rememberUpdatedState(canAddMarks)
     val currentOnStrokeAdded by rememberUpdatedState(onStrokeAdded)
     val currentOnStrokeErased by rememberUpdatedState(onStrokeErased)
 
@@ -92,7 +89,7 @@ fun ConfidentialMarkOverlay(
                         currentStroke = emptyList()
                         if (normalized.size >= 2) {
                             val mark = ConfidentialMarkStroke(normalized)
-                            if (currentCanAddMarks) savingMarks = savingMarks + mark
+                            savingMarks = savingMarks + mark
                             currentOnStrokeAdded(mark)
                         }
                     },

@@ -35,9 +35,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,8 +50,6 @@ import com.papr.scanner.presentation.common.Haptic
 import com.papr.scanner.presentation.common.LocalPaprHaptics
 import com.papr.scanner.presentation.common.PageImage
 import com.papr.scanner.presentation.common.paprViewModel
-import com.papr.scanner.presentation.paywall.ProUpgradeSheet
-import com.papr.scanner.usage.MeteredFeature
 import java.io.File
 import kotlinx.coroutines.flow.map
 
@@ -72,14 +67,10 @@ fun MergeConfirmScreen(
             container.documentRepository,
             container.documentMerger,
             container.documentDeleter,
-            container.usageTracker,
             container.userPreferencesRepository.settings.map { it.deleteOriginalsAfterMerge },
         )
     }
     val uiState by viewModel.uiState.collectAsState()
-    val mergeAllowance by viewModel.mergeAllowance.collectAsState()
-    // Non-null while the Pro sheet is open: why it opened.
-    var paywallReason by rememberSaveable { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val haptics = LocalPaprHaptics.current
 
@@ -93,12 +84,6 @@ fun MergeConfirmScreen(
         viewModel.errors.collect { message ->
             haptics.perform(Haptic.REJECT)
             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-        }
-    }
-    LaunchedEffect(Unit) {
-        viewModel.proSheetRequests.collect { reason ->
-            haptics.perform(Haptic.REJECT)
-            paywallReason = reason
         }
     }
 
@@ -126,9 +111,6 @@ fun MergeConfirmScreen(
                 .imePadding()
                 .fillMaxSize(),
         ) {
-            // Null while it's unknown or unlimited (Pro): no count is shown then.
-            val allowance = mergeAllowance
-            val mergesLeft = allowance?.remaining
             // Nothing changes once merging has started, so nothing looks changeable.
             val editable = !uiState.isMerging
             LazyColumn(modifier = Modifier.weight(1f)) {
@@ -172,53 +154,24 @@ fun MergeConfirmScreen(
                         ),
                     )
                 }
-                if (allowance != null && mergesLeft != null) {
-                    item {
-                        Text(
-                            if (mergesLeft == 0) {
-                                "No free merges left this month"
-                            } else {
-                                "$mergesLeft of ${allowance.limit} free merges left this month"
-                            },
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (mergesLeft == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
-                        )
-                    }
-                }
             }
-            if (mergesLeft == 0) {
-                Button(
-                    onClick = { paywallReason = MeteredFeature.MERGE.limitReachedMessage },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                ) {
-                    Text("Go Pro to merge")
-                }
-            } else {
-                Button(
-                    onClick = viewModel::merge,
-                    enabled = uiState.documents.size >= 2 && uiState.title.isNotBlank() && !uiState.isMerging,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                ) {
-                    Text(
-                        when {
-                            uiState.isMerging -> "Merging…"
-                            // Says what the tap will do, so deleting is never a surprise.
-                            uiState.deleteOriginals -> "Merge and delete originals"
-                            else -> "Merge"
-                        }
-                    )
-                }
+            Button(
+                onClick = viewModel::merge,
+                enabled = uiState.documents.size >= 2 && uiState.title.isNotBlank() && !uiState.isMerging,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            ) {
+                Text(
+                    when {
+                        uiState.isMerging -> "Merging…"
+                        // Says what the tap will do, so deleting is never a surprise.
+                        uiState.deleteOriginals -> "Merge and delete originals"
+                        else -> "Merge"
+                    }
+                )
             }
         }
-    }
-
-    paywallReason?.let { reason ->
-        ProUpgradeSheet(onDismiss = { paywallReason = null }, reason = reason)
     }
 }
 

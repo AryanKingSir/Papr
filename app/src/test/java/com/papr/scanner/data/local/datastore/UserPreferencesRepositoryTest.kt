@@ -28,7 +28,7 @@ class UserPreferencesRepositoryTest {
 
     private lateinit var dataStore: DataStore<Preferences>
 
-    // DataStore on the test's own dispatcher, as in UsageTrackerTest.
+    // DataStore on the test's own dispatcher.
     private fun TestScope.newRepository(): UserPreferencesRepository {
         dataStore = PreferenceDataStoreFactory.create(
             scope = CoroutineScope(coroutineContext + Job()),

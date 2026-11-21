@@ -30,9 +30,6 @@ import com.papr.scanner.presentation.detail.markup.MarkupHistory
 import com.papr.scanner.presentation.detail.markup.MarkupSnapshot
 import com.papr.scanner.presentation.detail.markup.ToolStyle
 import com.papr.scanner.presentation.detail.markup.defaultStyle
-import com.papr.scanner.usage.Allowance
-import com.papr.scanner.usage.MeteredFeature
-import com.papr.scanner.usage.UsageTracker
 import java.io.File
 import java.util.UUID
 import kotlin.math.ceil
@@ -48,7 +45,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -63,7 +59,6 @@ class DocumentDetailViewModel(
     private val documentDeleter: DocumentDeleter,
     private val pdfEngine: PdfEngine,
     private val pageImageExporter: PageImageExporter,
-    private val usageTracker: UsageTracker,
     private val savedSignatureStore: SavedSignatureStore,
     private val pageTextExtractor: PageTextExtractor,
     defaultExportFormatFlow: Flow<ExportFormat>,
@@ -134,17 +129,8 @@ class DocumentDetailViewModel(
     private val _errors = MutableSharedFlow<String>()
     val errors: SharedFlow<String> = _errors.asSharedFlow()
 
-    val isPro: StateFlow<Boolean> = usageTracker.isPro.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
-
     val defaultExportFormat: StateFlow<ExportFormat> =
         defaultExportFormatFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ExportFormat.PDF)
-
-    val allowances: StateFlow<Map<MeteredFeature, Allowance>> =
-        usageTracker.allowances.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
-
-    /** Asks the screen to show the Pro sheet, with the reason it's being shown. */
-    private val _proSheetRequests = MutableSharedFlow<String>()
-    val proSheetRequests: SharedFlow<String> = _proSheetRequests.asSharedFlow()
 
     init {
         viewModelScope.launch {
@@ -172,19 +158,8 @@ class DocumentDetailViewModel(
 
     fun closeMode() = openMode(EditorMode.NONE)
 
-    /**
-     * Adding confidential marks needs Pro, but a free user can still pick the
-     * tool on a page that already has marks (made before Pro was needed, or
-     * carried in by a merge) to remove them.
-     */
-    fun selectMarkupTool(tool: MarkupTool, pageHasMarks: Boolean) {
-        viewModelScope.launch {
-            if (tool != MarkupTool.CONFIDENTIAL || pageHasMarks || usageTracker.isPro.first()) {
-                localState.update { it.copy(markupTool = tool) }
-            } else {
-                _proSheetRequests.emit(MARKS_NEED_PRO)
-            }
-        }
+    fun selectMarkupTool(tool: MarkupTool) {
+        localState.update { it.copy(markupTool = tool) }
     }
 
     fun updateTitle(newTitle: String) {
@@ -310,14 +285,8 @@ class DocumentDetailViewModel(
     }
 
     fun addConfidentialMarkStroke(pageId: Long, stroke: ConfidentialMarkStroke) {
-        viewModelScope.launch {
-            if (!usageTracker.isPro.first()) {
-                _proSheetRequests.emit(MARKS_NEED_PRO)
-                return@launch
-            }
-            editMarkup(pageId, "Couldn't add the mark") { page ->
-                page.copy(confidentialMarks = page.confidentialMarks + stroke)
-            }
+        editMarkup(pageId, "Couldn't add the mark") { page ->
+            page.copy(confidentialMarks = page.confidentialMarks + stroke)
         }
     }
 
@@ -327,7 +296,6 @@ class DocumentDetailViewModel(
         }
     }
 
-    // Undoing never needs Pro: it only puts back what the page had a moment ago.
     // The history is read under fileMutex, after every edit queued before the tap has been
     // recorded - otherwise a quick Undo could reverse an older edit and wipe a newer one.
     fun undoMarkup() {
@@ -430,16 +398,10 @@ class DocumentDetailViewModel(
             exportImages()
             return
         }
-        val features = meteredFeaturesFor(settings)
         viewModelScope.launch {
             localState.update { it.copy(isExporting = true) }
             val snapshotDir = newExportSnapshotDir()
             try {
-                // The sheet locks used-up options, but it may have been opened before the last use.
-                usageTracker.firstUsedUp(features)?.let { usedUp ->
-                    _proSheetRequests.emit(usedUp.limitReachedMessage)
-                    return@launch
-                }
                 val (title, pages) = fileMutex.withLock {
                     val document = documentRepository.getDocument(documentId) ?: return@launch
                     val pages = documentRepository.getPages(documentId)
@@ -479,8 +441,6 @@ class DocumentDetailViewModel(
                     // export would otherwise stay behind in the document's folder for good.
                     document.pdfUri?.takeIf { it != exportFile.absolutePath }?.let { File(it).delete() }
                 }
-                // Only a finished export counts against the free plan's limits.
-                usageTracker.recordUse(features)
                 if (!compiled.metTarget) {
                     _errors.emit(
                         "Couldn't get it under ${formatMb(settings.targetSizeMb)} MB. " +
@@ -647,7 +607,6 @@ class DocumentDetailViewModel(
 
     private companion object {
         const val BYTES_PER_MB = 1024 * 1024
-        const val MARKS_NEED_PRO = "Adding confidential marks needs Papr Pro."
         const val OUT_OF_MEMORY_MESSAGE =
             "This document is too big to export like this on this phone. Try again with Compress turned on."
     }
@@ -660,14 +619,6 @@ private fun formatMb(megabytes: Float) = "%.1f".format(megabytes)
  * get under 0.2 MB, the smallest is 0.2 MB".
  */
 private fun formatSmallestMb(megabytes: Float) = "%.2f".format(ceil(megabytes * 100) / 100)
-
-/** The limited features an export with [settings] uses - the password only counts when one is set, and images use none. */
-internal fun meteredFeaturesFor(settings: ExportSettings): Set<MeteredFeature> = buildSet {
-    if (settings.format == ExportFormat.IMAGES) return@buildSet
-    if (settings.ocrEnabled) add(MeteredFeature.OCR_EXPORT)
-    if (settings.passwordEnabled && settings.password.isNotBlank()) add(MeteredFeature.PASSWORD_EXPORT)
-    if (settings.compressToTargetSize) add(MeteredFeature.COMPRESSED_EXPORT)
-}
 
 private fun Page.markupSnapshot() = MarkupSnapshot(annotations, confidentialMarks)
 

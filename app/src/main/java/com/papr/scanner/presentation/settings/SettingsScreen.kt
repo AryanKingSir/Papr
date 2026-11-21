@@ -20,18 +20,17 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -76,8 +75,6 @@ import com.papr.scanner.presentation.common.LocalPaprHaptics
 import com.papr.scanner.presentation.common.PageImage
 import com.papr.scanner.presentation.common.SignatureOverlayEditor
 import com.papr.scanner.presentation.common.paprViewModel
-import com.papr.scanner.presentation.paywall.ProUpgradeSheet
-import com.papr.scanner.usage.FREE_MONTHLY_LIMIT
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -87,15 +84,11 @@ fun SettingsScreen(onBack: () -> Unit, onShowTour: () -> Unit) {
             container.userPreferencesRepository,
             container.onboardingRepository,
             container.savedSignatureStore,
-            container.billingManager,
-            container.usageTracker.isPro,
             container.appSettings.value,
         )
     }
     val settings by viewModel.settings.collectAsState()
     val savedSignature by viewModel.savedSignature.collectAsState()
-    val isPro by viewModel.isPro.collectAsState()
-    val isRestoring by viewModel.isRestoring.collectAsState()
     val context = LocalContext.current
     val view = LocalView.current
     val haptics = LocalPaprHaptics.current
@@ -103,7 +96,6 @@ fun SettingsScreen(onBack: () -> Unit, onShowTour: () -> Unit) {
     // Saveable, so rotating the phone keeps an open pad, dialog or sheet open.
     var showSignaturePad by rememberSaveable { mutableStateOf(false) }
     var confirmRemoveSignature by rememberSaveable { mutableStateOf(false) }
-    var showProSheet by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.messages.collect { message -> Toast.makeText(context, message, Toast.LENGTH_LONG).show() }
@@ -231,40 +223,6 @@ fun SettingsScreen(onBack: () -> Unit, onShowTour: () -> Unit) {
             )
 
             SectionDivider()
-            SectionHeading("Papr Pro")
-            // Shown once known: a Pro owner shouldn't see "Free plan" for a frame first.
-            isPro?.let { isPro ->
-                ListItem(
-                    headlineContent = { Text(if (isPro) "You own Papr Pro" else "Free plan") },
-                    supportingContent = {
-                        Text(
-                            if (isPro) {
-                                "Every feature, with no monthly limits."
-                            } else {
-                                "$FREE_MONTHLY_LIMIT a month each of searchable-text, password and compressed exports and merges."
-                            }
-                        )
-                    },
-                    trailingContent = if (isPro) null else {
-                        { Button(onClick = { showProSheet = true }) { Text("Upgrade") } }
-                    },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                )
-            }
-            OutlinedButton(
-                onClick = viewModel::restorePurchase,
-                enabled = !isRestoring,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            ) {
-                if (isRestoring) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    Text("Checking Google Play…", modifier = Modifier.padding(start = 8.dp))
-                } else {
-                    Text("Restore purchase")
-                }
-            }
-
-            SectionDivider()
             SectionHeading("Contact us")
             ListItem(
                 headlineContent = { Text(Constants.SUPPORT_EMAIL) },
@@ -280,6 +238,13 @@ fun SettingsScreen(onBack: () -> Unit, onShowTour: () -> Unit) {
                 headlineContent = { Text("Papr ${BuildConfig.VERSION_NAME}") },
                 supportingContent = { Text("Your documents stay on this phone. Papr never uploads them.") },
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            )
+            ListItem(
+                headlineContent = { Text("Source code") },
+                supportingContent = { Text("Papr is free and open source. See the code or report a problem on GitHub.") },
+                leadingContent = { Icon(Icons.Outlined.Code, contentDescription = null) },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                modifier = Modifier.clickable(onClickLabel = "Open on GitHub") { openSourceCode(context) },
             )
             ListItem(
                 headlineContent = { Text("Show the tour again") },
@@ -323,10 +288,6 @@ fun SettingsScreen(onBack: () -> Unit, onShowTour: () -> Unit) {
                 TextButton(onClick = { confirmRemoveSignature = false }) { Text("Cancel") }
             },
         )
-    }
-
-    if (showProSheet) {
-        ProUpgradeSheet(onDismiss = { showProSheet = false })
     }
 }
 
@@ -391,6 +352,15 @@ private fun <T> ChoiceRow(options: List<T>, selected: T, label: (T) -> String, o
                 shape = SegmentedButtonDefaults.itemShape(index, options.size),
             ) { Text(label(option)) }
         }
+    }
+}
+
+/** Opens the GitHub repository in the browser. */
+private fun openSourceCode(context: Context) {
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Constants.SOURCE_URL.toUri()))
+    } catch (e: ActivityNotFoundException) {
+        Toast.makeText(context, "No browser found. The code is at ${Constants.SOURCE_URL}", Toast.LENGTH_LONG).show()
     }
 }
 

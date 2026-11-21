@@ -103,7 +103,6 @@ import com.papr.scanner.presentation.detail.components.SubToolbar
 import com.papr.scanner.presentation.detail.components.TextNoteDialog
 import com.papr.scanner.presentation.detail.markup.defaultStyle
 import com.papr.scanner.presentation.detail.markup.sizeFraction
-import com.papr.scanner.presentation.paywall.ProUpgradeSheet
 import kotlinx.coroutines.flow.map
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -121,7 +120,6 @@ fun DocumentDetailScreen(
             container.documentDeleter,
             container.pdfEngine,
             container.pageImageExporter,
-            container.usageTracker,
             container.savedSignatureStore,
             container.pageTextExtractor,
             container.userPreferencesRepository.settings.map { it.defaultExportFormat },
@@ -129,8 +127,6 @@ fun DocumentDetailScreen(
         )
     }
     val uiState by viewModel.uiState.collectAsState()
-    val allowances by viewModel.allowances.collectAsState()
-    val isPro by viewModel.isPro.collectAsState()
     val defaultExportFormat by viewModel.defaultExportFormat.collectAsState()
     val context = LocalContext.current
     val currentOnBack by rememberUpdatedState(onBack)
@@ -148,8 +144,6 @@ fun DocumentDetailScreen(
     var pendingReplacePage by rememberSaveable { mutableStateOf(false) }
     var textEdit by rememberSaveable(stateSaver = TextEditRequestSaver) { mutableStateOf<TextEditRequest?>(null) }
     var showOrganize by rememberSaveable { mutableStateOf(false) }
-    // Non-null while the Pro sheet is open: why it opened.
-    var paywallReason by rememberSaveable { mutableStateOf<String?>(null) }
 
     // Leave exactly once, whether the document was deleted here (its last
     // page removed) or turns out not to exist - never sit on an empty screen.
@@ -200,12 +194,6 @@ fun DocumentDetailScreen(
         viewModel.errors.collect { message ->
             haptics.perform(Haptic.REJECT)
             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-        }
-    }
-    LaunchedEffect(Unit) {
-        viewModel.proSheetRequests.collect { reason ->
-            haptics.perform(Haptic.REJECT)
-            paywallReason = reason
         }
     }
     // Opening any group of tools shows the tip has done its job.
@@ -345,7 +333,6 @@ fun DocumentDetailScreen(
                 markupTool = uiState.markupTool.takeIf { inMarkup },
                 toolStyle = toolStyle,
                 isPlacingSignature = uiState.isPlacingSignature,
-                canAddMarks = isPro,
                 // Outside Markup, tapping a signature opens the Sign tools to move it.
                 onSignatureTap = { _: Page -> viewModel.openMode(EditorMode.SIGN) }.takeIf { !inMarkup },
                 onSignaturePlacementChange = { page, x, y, width -> viewModel.updateSignaturePlacement(page.id, x, y, width) },
@@ -389,11 +376,8 @@ fun DocumentDetailScreen(
                     style = toolStyle,
                     hint = when (uiState.markupTool) {
                         MarkupTool.ERASER -> "Drag across markup to erase it."
-                        MarkupTool.CONFIDENTIAL -> if (isPro) {
+                        MarkupTool.CONFIDENTIAL ->
                             "Drag to cover content, tap a mark to remove it. Papr's search still finds covered text."
-                        } else {
-                            "Tap a mark to remove it. Adding marks needs Papr Pro."
-                        }
                         else -> null
                     },
                     onStyleChange = { style -> viewModel.setToolStyle(uiState.markupTool, style) },
@@ -425,11 +409,8 @@ fun DocumentDetailScreen(
                 }
                 EditorMode.MARKUP -> SubToolbar(vertical, onDone = viewModel::closeMode) {
                     val pick = { tool: MarkupTool ->
-                        val pageHasMarks = currentPage?.confidentialMarks?.isNotEmpty() == true
-                        // A locked Confidential tap buzzes "no" when the Pro sheet opens instead.
-                        val opens = tool != MarkupTool.CONFIDENTIAL || pageHasMarks || isPro
-                        if (opens && tool != uiState.markupTool) haptics.perform(Haptic.SEGMENT_TICK)
-                        viewModel.selectMarkupTool(tool, pageHasMarks = pageHasMarks)
+                        if (tool != uiState.markupTool) haptics.perform(Haptic.SEGMENT_TICK)
+                        viewModel.selectMarkupTool(tool)
                     }
                     val tool = uiState.markupTool
                     ToolButton(Icons.Outlined.Create, "Pen", { pick(MarkupTool.PEN) }, selected = tool == MarkupTool.PEN)
@@ -441,7 +422,6 @@ fun DocumentDetailScreen(
                         "Confidential",
                         { pick(MarkupTool.CONFIDENTIAL) },
                         selected = tool == MarkupTool.CONFIDENTIAL,
-                        locked = !isPro,
                     )
                 }
                 EditorMode.SIGN -> SubToolbar(vertical, onDone = viewModel::closeMode) {
@@ -566,18 +546,9 @@ fun DocumentDetailScreen(
         ExportOptionsSheet(
             isExporting = uiState.isExporting,
             initialFormat = defaultExportFormat,
-            allowances = allowances,
             onExport = viewModel::export,
-            onLockedOptionTap = { feature ->
-                haptics.perform(Haptic.REJECT)
-                paywallReason = feature.limitReachedMessage
-            },
             onDismiss = { showExportOptions = false },
         )
-    }
-
-    paywallReason?.let { reason ->
-        ProUpgradeSheet(onDismiss = { paywallReason = null }, reason = reason)
     }
 
     if (pendingReplacePage) {

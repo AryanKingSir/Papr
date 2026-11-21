@@ -1,6 +1,5 @@
 package com.papr.scanner.presentation.detail.components
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,11 +8,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -33,8 +29,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -47,8 +41,6 @@ import com.papr.scanner.pdf.security.StandardSecurityHandler
 import com.papr.scanner.presentation.common.HapticsFollowSetting
 import com.papr.scanner.presentation.common.LocalPaprHaptics
 import com.papr.scanner.presentation.detail.ExportSettings
-import com.papr.scanner.usage.Allowance
-import com.papr.scanner.usage.MeteredFeature
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,9 +48,7 @@ fun ExportOptionsSheet(
     isExporting: Boolean,
     // The Settings default; the sheet can still switch for this export.
     initialFormat: ExportFormat,
-    allowances: Map<MeteredFeature, Allowance>,
     onExport: (ExportSettings) -> Unit,
-    onLockedOptionTap: (MeteredFeature) -> Unit,
     onDismiss: () -> Unit,
 ) {
     // Fully open from the start: half open, turning on a password pushed Export below the screen's edge.
@@ -72,14 +62,6 @@ fun ExportOptionsSheet(
     var passwordEnabled by rememberSaveable { mutableStateOf(false) }
     var password by remember { mutableStateOf("") }
     val passwordSupported = StandardSecurityHandler.isSupportedPassword(password)
-    val keyboard = LocalSoftwareKeyboardController.current
-    val focusManager = LocalFocusManager.current
-    // The Pro sheet opens on top of this one; the password keyboard mustn't stay up behind it.
-    val lockedTap = { feature: MeteredFeature ->
-        keyboard?.hide()
-        focusManager.clearFocus()
-        onLockedOptionTap(feature)
-    }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         // Scrolls so Export stays reachable when the options don't fit: landscape,
@@ -118,16 +100,12 @@ fun ExportOptionsSheet(
                     subtitle = "Recognize text so it can be selected and searched",
                     checked = ocrEnabled,
                     onCheckedChange = { ocrEnabled = it },
-                    allowance = allowances[MeteredFeature.OCR_EXPORT],
-                    onLockedTap = { lockedTap(MeteredFeature.OCR_EXPORT) },
                 )
                 OptionRow(
                     title = "Compress to target size",
                     subtitle = "Reduce image quality to hit a target file size",
                     checked = compressEnabled,
                     onCheckedChange = { compressEnabled = it },
-                    allowance = allowances[MeteredFeature.COMPRESSED_EXPORT],
-                    onLockedTap = { lockedTap(MeteredFeature.COMPRESSED_EXPORT) },
                 )
                 if (compressEnabled) {
                     Text("Target: ${"%.1f".format(targetSizeMb)} MB", modifier = Modifier.padding(top = 4.dp))
@@ -147,8 +125,6 @@ fun ExportOptionsSheet(
                     subtitle = "Require a password to open the PDF",
                     checked = passwordEnabled,
                     onCheckedChange = { passwordEnabled = it },
-                    allowance = allowances[MeteredFeature.PASSWORD_EXPORT],
-                    onLockedTap = { lockedTap(MeteredFeature.PASSWORD_EXPORT) },
                 )
                 if (passwordEnabled) {
                     HapticsFollowSetting {
@@ -211,52 +187,23 @@ private fun OptionRow(
     subtitle: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    // Null while it's unknown or unlimited (Pro): the row then shows no count.
-    allowance: Allowance?,
-    onLockedTap: () -> Unit,
 ) {
-    val remaining = allowance?.remaining
-    val locked = remaining == 0
     val haptics = LocalPaprHaptics.current
     // The whole row toggles, not just the switch - tapping the label is the natural target.
-    // A used-up option can't be switched on; tapping it explains why instead.
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(
-                if (locked) {
-                    Modifier.clickable(role = Role.Button, onClick = onLockedTap)
-                } else {
-                    Modifier.toggleable(value = checked, role = Role.Switch) { on ->
-                        haptics.toggle(on)
-                        onCheckedChange(on)
-                    }
-                }
-            )
+            .toggleable(value = checked, role = Role.Switch) { on ->
+                haptics.toggle(on)
+                onCheckedChange(on)
+            }
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
             Text(subtitle, style = MaterialTheme.typography.labelLarge)
-            if (remaining != null) {
-                Text(
-                    if (locked) "None left this month" else "$remaining of ${allowance.limit} left this month",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (locked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 2.dp),
-                )
-            }
         }
-        if (locked) {
-            Icon(
-                Icons.Filled.Lock,
-                contentDescription = "Needs Papr Pro",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 12.dp),
-            )
-        } else {
-            Switch(checked = checked, onCheckedChange = null)
-        }
+        Switch(checked = checked, onCheckedChange = null)
     }
 }

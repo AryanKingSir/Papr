@@ -6,9 +6,6 @@ import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
-import com.papr.scanner.billing.BillingManager
-import com.papr.scanner.billing.RealPlayBillingClient
-import com.papr.scanner.core.Constants
 import com.papr.scanner.data.local.SavedSignatureStore
 import com.papr.scanner.data.local.datastore.OnboardingRepository
 import com.papr.scanner.data.local.datastore.UserPreferencesRepository
@@ -32,7 +29,6 @@ import com.papr.scanner.pdf.PdfEngine
 import com.papr.scanner.pdf.security.PdfEncryptor
 import com.papr.scanner.scanner.DocumentScannerManager
 import com.papr.scanner.scanner.ScanImporter
-import com.papr.scanner.usage.UsageTracker
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -42,7 +38,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 
 // An unreadable file (a bad restore, a torn write) starts over from defaults rather than crashing
-// every launch. Pro comes back on the next Play check.
+// every launch.
 private val Context.userPreferencesDataStore by preferencesDataStore(
     name = "user_prefs",
     corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
@@ -127,13 +123,5 @@ class AppContainer(private val context: Context) {
 
     val scanImporter: ScanImporter by lazy {
         ScanImporter(context, documentRepository, documentScannerManager, documentDeleter, pageTextExtractor, applicationScope)
-    }
-
-    val billingManager: BillingManager by lazy {
-        BillingManager(RealPlayBillingClient(context), userPreferencesRepository, Constants.PRO_PRODUCT_ID)
-    }
-
-    val usageTracker: UsageTracker by lazy {
-        UsageTracker(context.userPreferencesDataStore, userPreferencesRepository.isProUnlocked)
     }
 }
