@@ -1,11 +1,8 @@
 package com.papr.scanner.presentation.settings
 
 import android.content.ActivityNotFoundException
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
@@ -27,7 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Code
-import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Feedback
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -225,11 +222,11 @@ fun SettingsScreen(onBack: () -> Unit, onShowTour: () -> Unit) {
             SectionDivider()
             SectionHeading("Contact us")
             ListItem(
-                headlineContent = { Text(Constants.SUPPORT_EMAIL) },
-                supportingContent = { Text("Questions, problems or ideas? Tap to email us.") },
-                leadingContent = { Icon(Icons.Outlined.Email, contentDescription = null) },
+                headlineContent = { Text("Report a problem or suggest an idea") },
+                supportingContent = { Text("Opens Papr's issues on GitHub.") },
+                leadingContent = { Icon(Icons.Outlined.Feedback, contentDescription = null) },
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                modifier = Modifier.clickable(onClickLabel = "Email us") { emailSupport(context) },
+                modifier = Modifier.clickable(onClickLabel = "Open GitHub issues") { openInBrowser(context, Constants.ISSUES_URL) },
             )
 
             SectionDivider()
@@ -241,10 +238,10 @@ fun SettingsScreen(onBack: () -> Unit, onShowTour: () -> Unit) {
             )
             ListItem(
                 headlineContent = { Text("Source code") },
-                supportingContent = { Text("Papr is free and open source. See the code or report a problem on GitHub.") },
+                supportingContent = { Text("Papr is free and open source. See the code on GitHub.") },
                 leadingContent = { Icon(Icons.Outlined.Code, contentDescription = null) },
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                modifier = Modifier.clickable(onClickLabel = "Open on GitHub") { openSourceCode(context) },
+                modifier = Modifier.clickable(onClickLabel = "Open on GitHub") { openInBrowser(context, Constants.SOURCE_URL) },
             )
             ListItem(
                 headlineContent = { Text("Show the tour again") },
@@ -355,27 +352,11 @@ private fun <T> ChoiceRow(options: List<T>, selected: T, label: (T) -> String, o
     }
 }
 
-/** Opens the GitHub repository in the browser. */
-private fun openSourceCode(context: Context) {
+/** Opens [url] in the browser, or says where to find it when there's no browser. */
+private fun openInBrowser(context: Context, url: String) {
     try {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Constants.SOURCE_URL.toUri()))
+        context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
     } catch (e: ActivityNotFoundException) {
-        Toast.makeText(context, "No browser found. The code is at ${Constants.SOURCE_URL}", Toast.LENGTH_LONG).show()
-    }
-}
-
-/**
- * Opens the email app addressed to support, with the app version in the subject. Without an
- * email app, copies the address instead, so it can still be pasted somewhere.
- */
-private fun emailSupport(context: Context) {
-    val subject = Uri.encode("Papr ${BuildConfig.VERSION_NAME}")
-    val intent = Intent(Intent.ACTION_SENDTO, "mailto:${Constants.SUPPORT_EMAIL}?subject=$subject".toUri())
-    try {
-        context.startActivity(intent)
-    } catch (e: ActivityNotFoundException) {
-        val clipboard = context.getSystemService(ClipboardManager::class.java)
-        clipboard.setPrimaryClip(ClipData.newPlainText("Papr support email", Constants.SUPPORT_EMAIL))
-        Toast.makeText(context, "No email app found, so the address was copied.", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, "No browser found. Go to $url", Toast.LENGTH_LONG).show()
     }
 }
